@@ -7,27 +7,34 @@ SCOPES = ['https://www.googleapis.com/auth/calendar']
 
 # --- CONFIGURAÇÃO DE SERVIÇOS E VALORES ---
 SERVICOS = {
-    "Corte de Cabelo": 45.00,
-    "Barba": 35.00,
-    "Corte + Barba": 70.00
+    "Corte de Cabelo": {"valor": 45.00, "duracao": 45},
+    "Barba": {"valor": 35.00, "duracao": 30},
+    "Corte + Barba": {"valor": 70.00, "duracao": 75}
 }
 
 # --- AUTENTICAÇÃO COM CONTA DE SERVIÇO ---
 @st.cache_resource
 def autenticar_google():
-    """Autentica na API do Google Calendar usando Conta de Serviço via Streamlit Secrets."""
+    """Autentica na API do Google Calendar usando Conta de Serviço via st.secrets ou arquivo local."""
     try:
-        # Lê credenciais diretamente dos Secrets do Streamlit Cloud
         if "gcp_service_account" in st.secrets:
+            # Converte os dados dos secrets para um dicionário normal
             creds_info = dict(st.secrets["gcp_service_account"])
-            # Corrige quebras de linha na private_key caso venham escapadas
-            if "\\n" in creds_info.get("private_key", ""):
-                creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
+            
+            # Sanitização estrita da chave privada PEM
+            raw_key = creds_info.get("private_key", "")
+            if "\\n" in raw_key:
+                raw_key = raw_key.replace("\\n", "\n")
+            
+            # Remove aspas extras que o TOML possa ter mantido
+            raw_key = raw_key.strip().strip("'").strip('"')
+            creds_info["private_key"] = raw_key
+
             creds = service_account.Credentials.from_service_account_info(
                 creds_info, scopes=SCOPES
             )
         else:
-            # Fallback para desenvolvimento local via arquivo JSON
+            # Fallback para desenvolvimento local
             creds = service_account.Credentials.from_service_account_file(
                 "service_account.json", scopes=SCOPES
             )
@@ -37,15 +44,14 @@ def autenticar_google():
         return None
 
 def obter_calendar_id():
-    """Obtém o ID da agenda dos Secrets ou usa a agenda principal."""
+    """Obtém o ID da agenda dos Secrets ou utiliza a agenda primária."""
     return st.secrets.get("CALENDAR_ID", "primary")
 
 # --- BUSCA DE HORÁRIOS OCUPADOS ---
-def obter_horarios_ocupados(service, data):
-    """Busca no Google Agenda os horários já ocupados para a data informada."""
+def obter_intervalos_ocupados(service, data):
+    """Busca os intervalos de início e término dos eventos já marcados na data informada."""
     calendar_id = obter_calendar_id()
     
-    # Define o intervalo do dia em UTC-3 (Horário de Brasília)
     inicio_dia = datetime.datetime.combine(data, datetime.time(0, 0, 0)).isoformat() + '-03:00'
     fim_dia = datetime.datetime.combine(data, datetime.time(23, 59, 59)).isoformat() + '-03:00'
 
@@ -58,28 +64,33 @@ def obter_horarios_ocupados(service, data):
     ).execute()
     
     events = events_result.get('items', [])
-    horarios_ocupados = []
+    intervalos = []
 
     for event in events:
-        start = event['start'].get('dateTime', event['start'].get('date'))
-        if start and 'T' in start:
-            # Converte para objeto datetime para extrair a hora correta
-            dt = datetime.datetime.fromisoformat(start)
-            horarios_ocupados.append(dt.strftime("%H:%M"))
+        start_str = event['start'].get('dateTime', event['start'].get('date'))
+        end_str = event['end'].get('dateTime', event['end'].get('date'))
+        if start_str and end_str and 'T' in start_str:
+            dt_inicio = datetime.datetime.fromisoformat(start_str)
+            dt_fim = datetime.datetime.fromisoformat(end_str)
+            intervalos.append((dt_inicio.time(), dt_fim.time()))
             
-    return horarios_ocupados
+    return intervalos
 
 # --- AGENDAMENTO NO GOOGLE CALENDAR ---
-def criar_agendamento_google(service, nome, telefone, servico, valor, data, horario):
-    """Cria um novo evento no Google Agenda."""
+def criar_agendamento_google(service, nome, telefone, servico_nome, data, horario_str):
+    """Cria um novo evento no Google Agenda com duração e valores corretos."""
     calendar_id = obter_calendar_id()
-    hora, minuto = map(int, horario.split(':'))
+    dados_servico = SERVICOS[servico_nome]
+    duracao = dados_servico["duracao"]
+    valor = dados_servico["valor"]
+    
+    hora, minuto = map(int, horario_str.split(':'))
     data_inicio = datetime.datetime.combine(data, datetime.time(hora, minuto))
-    data_fim = data_inicio + datetime.timedelta(minutes=45)
+    data_fim = data_inicio + datetime.timedelta(minutes=duracao)
 
     evento = {
-        'summary': f'💈 {servico} - {nome}',
-        'description': f'Cliente: {nome}\nWhatsApp: {telefone}\nServiço: {servico}\nValor: R$ {valor:.2f}',
+        'summary': f'💈 {servico_nome} - {nome}',
+        'description': f'Cliente: {nome}\nWhatsApp: {telefone}\nServiço: {servico_nome}\nValor: R$ {valor:.2f}\nDuração: {duracao} min',
         'start': {
             'dateTime': data_inicio.isoformat(),
             'timeZone': 'America/Sao_Paulo',
@@ -94,10 +105,11 @@ def criar_agendamento_google(service, nome, telefone, servico, valor, data, hora
 
 # --- INTERFACE DE USUÁRIO (STREAMLIT) ---
 def main():
-    st.set_page_config(page_title="Agendamento Barbearia", page_icon="💈", layout="centered")
+    st.set_page_config(page_title="Barbearia - Agendamento", page_icon="💈", layout="centered")
     
-    st.title("💈 Barbearia Style - Agendamento")
-    st.write("Escolha o serviço, a data e o horário para agendar seu atendimento.")
+    st.markdown("<h1 style='text-align: center;'>💈 Barbearia Style</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: gray;'>Agende seu atendimento de forma rápida</p>", unsafe_allow_html=True)
+    st.write("---")
 
     calendar_service = autenticar_google()
     if not calendar_service:
@@ -107,79 +119,95 @@ def main():
     st.subheader("1. Seus Dados")
     col1, col2 = st.columns(2)
     with col1:
-        nome = st.text_input("Nome Completo")
+        nome = st.text_input("Nome Completo *")
     with col2:
-        telefone = st.text_input("WhatsApp / Telefone", placeholder="(11) 99999-9999")
+        telefone = st.text_input("WhatsApp / Telefone *", placeholder="(11) 99999-9999")
 
     # 2. Escolha do Serviço
     st.subheader("2. Escolha o Serviço")
     opcao_servico = st.radio(
         "Selecione uma opção:",
         options=list(SERVICOS.keys()),
-        format_func=lambda x: f"{x} — R$ {SERVICOS[x]:.2f}"
+        format_func=lambda x: f"{x} — R$ {SERVICOS[x]['valor']:.2f} ({SERVICOS[x]['duracao']} min)"
     )
-    valor_servico = SERVICOS[opcao_servico]
+    duracao_servico = SERVICOS[opcao_servico]["duracao"]
+    valor_servico = SERVICOS[opcao_servico]["valor"]
 
     # 3. Escolha da Data
     st.subheader("3. Selecione a Data")
+    hoje = datetime.date.today()
     data_selecionada = st.date_input(
         "Data do agendamento", 
-        min_value=datetime.date.today(),
-        max_value=datetime.date.today() + datetime.timedelta(days=30)
+        min_value=hoje,
+        max_value=hoje + datetime.timedelta(days=30)
     )
 
-    # 4. Seleção de Horários Disponíveis
+    # 4. Cálculo Dinâmico de Horários Livres
     st.subheader("4. Horários Disponíveis")
     
-    horarios_totais = [
-        "09:00", "10:00", "11:00", "13:00", 
-        "14:00", "15:00", "16:00", "17:00", "18:00"
+    # Grade de horários possíveis de atendimento
+    grade_horarios = [
+        "09:00", "09:45", "10:30", "11:15", "13:00", 
+        "13:45", "14:30", "15:15", "16:00", "16:45", "17:30", "18:15"
     ]
 
-    with st.spinner("Buscando horários disponíveis..."):
-        horarios_ocupados = obter_horarios_ocupados(calendar_service, data_selecionada)
+    with st.spinner("Consultando horários disponíveis..."):
+        ocupados = obter_intervalos_ocupados(calendar_service, data_selecionada)
         
     agora = datetime.datetime.now()
     horarios_livres = []
     
-    for h in horarios_totais:
-        if h in horarios_ocupados:
+    for h in grade_horarios:
+        h_obj = datetime.datetime.strptime(h, "%H:%M").time()
+        slot_inicio = datetime.datetime.combine(data_selecionada, h_obj)
+        slot_fim = slot_inicio + datetime.timedelta(minutes=duracao_servico)
+        
+        # Ignora horários passados caso a data seja o dia de hoje
+        if data_selecionada == hoje and slot_inicio <= agora:
             continue
-        # Se for no mesmo dia, remove horários do passado
-        if data_selecionada == datetime.date.today():
-            h_obj = datetime.datetime.strptime(h, "%H:%M").time()
-            if datetime.datetime.combine(data_selecionada, h_obj) <= agora:
-                continue
-        horarios_livres.append(h)
+            
+        # Valida se o serviço bate com algum evento já agendado
+        conflito = False
+        for oc_ini, oc_fim in ocupados:
+            if max(slot_inicio.time(), oc_ini) < min(slot_fim.time(), oc_fim):
+                conflito = True
+                break
+                
+        if not conflito:
+            horarios_livres.append(h)
 
     if not horarios_livres:
-        st.warning("Não há horários disponíveis para esta data. Por favor, escolha outro dia.")
+        st.warning("⚠️ Não há horários disponíveis para esta data. Por favor, selecione outro dia.")
         horario_selecionado = None
     else:
-        horario_selecionado = st.selectbox("Horários livres:", horarios_livres)
+        horario_selecionado = st.selectbox("Selecione o horário:", horarios_livres)
 
     st.write("---")
     if st.button("Confirmar Agendamento", type="primary", use_container_width=True):
         if not nome.strip() or not telefone.strip():
-            st.error("Por favor, preencha seu nome e telefone antes de confirmar.")
+            st.error("Por favor, preencha seu nome e telefone.")
         elif not horario_selecionado:
-            st.error("Selecione um horário disponível.")
+            st.error("Selecione um horário disponível antes de confirmar.")
         else:
             try:
-                with st.spinner("Registrando agendamento..."):
+                with st.spinner("Salvando agendamento na agenda..."):
                     criar_agendamento_google(
                         service=calendar_service,
                         nome=nome,
                         telefone=telefone,
-                        servico=opcao_servico,
-                        valor=valor_servico,
+                        servico_nome=opcao_servico,
                         data=data_selecionada,
-                        horario=horario_selecionado
+                        horario_str=horario_selecionado
                     )
-                st.success(f"✅ Agendamento realizado com sucesso para {data_selecionada.strftime('%d/%m/%Y')} às {horario_selecionado}!")
                 st.balloons()
+                st.success(f"""
+                ✅ **Agendamento Confirmado!**
+                - **Cliente:** {nome}
+                - **Serviço:** {opcao_servico} (R$ {valor_servico:.2f})
+                - **Data:** {data_selecionada.strftime('%d/%m/%Y')} às {horario_selecionado}
+                """)
             except Exception as e:
-                st.error(f"Erro ao salvar na agenda: {e}")
+                st.error(f"Erro ao registrar agendamento: {e}")
 
 if __name__ == '__main__':
     main()
