@@ -1,6 +1,8 @@
 import streamlit as st
-import streamlit.components.v1 as components
+import requests
+import datetime
 
+# ================= CONFIGURAÇÃO =================
 st.set_page_config(
     page_title="Painel do Barbeiro - Barbearia Style",
     page_icon="✂️",
@@ -8,174 +10,143 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# Estilização moderna escura com detalhes dourados
 st.markdown("""
     <style>
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         header {visibility: hidden;}
         .block-container {
-            padding: 0 !important;
-            max-width: 100% !important;
+            padding-top: 1.5rem !important;
+            padding-bottom: 2rem !important;
+            max-width: 900px !important;
+        }
+        .stApp {
+            background-color: #121212;
+            color: #E0E0E0;
+        }
+        .card-agendamento {
+            background-color: #1E1E1E;
+            border: 1px solid #2F2F2F;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
         }
     </style>
 """, unsafe_allow_html=True)
 
-html_code = """
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel do Barbeiro</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
-        body {
-            font-family: 'Poppins', sans-serif;
-            background-color: #121212;
-            color: #E0E0E0;
-            margin: 0;
-            padding: 0;
-        }
-        .gold-bg { background-color: #D4AF37; }
-        .gold-text { color: #D4AF37; }
-        .card-dark { background-color: #1E1E1E; }
-        .input-dark { background-color: #2A2A2A; color: #FFFFFF; border: 1px solid #333; }
-        .input-dark:focus { border-color: #D4AF37; outline: none; }
-    </style>
-</head>
-<body class="min-h-screen pb-16">
+# URL da sua automação no Google Apps Script
+WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzQoJrcSlveATovQ-syyGJs49JmdgkhcfkKu3jw2ve2lyN36f5fMrbsJokWzgqxNh95/exec"
 
-    <header class="card-dark border-b border-zinc-800 sticky top-0 z-50 shadow-md">
-        <div class="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
-            <div class="flex items-center space-x-3">
-                <i class="fa-solid font-bold text-2xl gold-text fa-scissors"></i>
-                <h1 class="text-xl font-bold tracking-wide">PAINEL DO <span class="gold-text">BARBEIRO</span></h1>
-            </div>
-            <a href="https://calendar.google.com" target="_blank" class="text-xs gold-text border border-yellow-600/50 px-3 py-1.5 rounded-full hover:bg-yellow-500 hover:text-black transition flex items-center gap-1.5">
-                <i class="fa-brands fa-google"></i> Abrir Google Agenda
+# ================= FUNÇÕES DE INTEGRAÇÃO =================
+def carregar_agendamentos(data_str):
+    """Busca os agendamentos reais gravados no Google Calendar via Apps Script."""
+    try:
+        url = f"{WEB_APP_URL}?action=get_bookings&date={data_str}"
+        response = requests.get(url, timeout=15)
+        res = response.json()
+        if res.get("status") == "ok":
+            return res.get("bookings", [])
+    except Exception as e:
+        st.error(f"Erro ao consultar a Google Agenda: {e}")
+    return []
+
+def cancelar_evento(event_id):
+    """Exclui o agendamento diretamente do Google Calendar."""
+    try:
+        response = requests.post(
+            WEB_APP_URL,
+            json={"action": "cancel", "eventId": event_id},
+            timeout=15
+        )
+        res = response.json()
+        return res.get("status") == "success"
+    except Exception:
+        return False
+
+# ================= INTERFACE =================
+# Cabeçalho
+col_logo, col_link = st.columns([3, 1])
+with col_logo:
+    st.markdown("## ✂️ Painel do **Barbeiro**")
+    st.caption("Consulte os horários agendados em tempo real na sua Google Agenda")
+with col_link:
+    st.markdown(
+        """
+        <div style="text-align: right; margin-top: 10px;">
+            <a href="https://calendar.google.com" target="_blank" style="text-decoration:none; background-color:#2A2A2A; color:#D4AF37; padding:8px 14px; border-radius:20px; font-size:12px; border:1px solid #D4AF37;">
+                📅 Abrir Google Agenda
             </a>
         </div>
-    </header>
+        """,
+        unsafe_allow_html=True
+    )
 
-    <main class="max-w-4xl mx-auto px-4 mt-8">
-        
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-            <div>
-                <h2 class="text-2xl font-bold">Fila de Atendimentos</h2>
-                <p class="text-zinc-400 text-xs">Visualize e gerencie os horários agendados pelos clientes.</p>
-            </div>
+st.write("---")
+
+# Filtro de Data
+col_data, col_refresh = st.columns([3, 1])
+with col_data:
+    data_selecionada = st.date_input("Filtrar por data:", value=datetime.date.today())
+with col_refresh:
+    st.write("")
+    st.write("")
+    if st.button("🔄 Atualizar", use_container_width=True):
+        st.rerun()
+
+data_str = data_selecionada.strftime("%Y-%m-%d")
+
+# Consulta dos eventos
+with st.spinner("Buscando agendamentos no Google Agenda..."):
+    agendamentos = carregar_agendamentos(data_str)
+
+# Métricas Rápidas
+col_m1, col_m2 = st.columns(2)
+with col_m1:
+    st.metric("Total de Clientes no Dia", len(agendamentos))
+with col_m2:
+    faturamento = 0.0
+    for ag in agendamentos:
+        desc = ag.get("description", "")
+        if "R$" in desc:
+            try:
+                val_str = desc.split("R$")[1].strip().split("\n")[0].replace(",", ".")
+                faturamento += float(val_str)
+            except Exception:
+                pass
+    st.metric("Faturamento Estimado", f"R$ {faturamento:.2f}".replace(".", ","))
+
+st.write("---")
+
+# Lista de Horários
+if not agendamentos:
+    st.info("Nenhum agendamento encontrado para esta data no Google Agenda.")
+else:
+    # Ordena por horário crescente
+    agendamentos.sort(key=lambda x: x.get("time", ""))
+    
+    for ag in agendamentos:
+        hora = ag.get("time", "--:--")
+        titulo = ag.get("title", "Agendamento")
+        descricao = ag.get("description", "Sem detalhes adicionais")
+        ev_id = ag.get("id")
+
+        with st.container():
+            col_info, col_btn = st.columns([4, 1])
+            with col_info:
+                st.markdown(f"### ⏰ {hora} - {titulo}")
+                linhas = descricao.split("\n")
+                for linha in linhas:
+                    st.write(f"- {linha}")
             
-            <!-- Filtro de Data -->
-            <div class="card-dark p-2 px-3 rounded-xl border border-zinc-800 flex items-center gap-3">
-                <label class="text-xs text-zinc-400">Data:</label>
-                <input type="date" id="filter-date" onchange="renderBookings()" class="p-2 rounded-lg input-dark text-xs">
-            </div>
-        </div>
-
-        <!-- Métricas Rápidas do Dia -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-            <div class="card-dark p-4 rounded-xl border border-zinc-800">
-                <span class="text-zinc-400 text-xs block">Total de Agendamentos</span>
-                <span id="metric-total" class="text-2xl font-bold text-white">0</span>
-            </div>
-            <div class="card-dark p-4 rounded-xl border border-zinc-800">
-                <span class="text-zinc-400 text-xs block">Faturamento Previsto</span>
-                <span id="metric-revenue" class="text-2xl font-bold gold-text">R$ 0,00</span>
-            </div>
-            <div class="card-dark p-4 rounded-xl border border-zinc-800">
-                <span class="text-zinc-400 text-xs block">Atendimentos Ativos</span>
-                <span id="metric-active" class="text-2xl font-bold text-green-400">0</span>
-            </div>
-        </div>
-
-        <!-- Lista de Agendamentos -->
-        <div id="bookings-list" class="space-y-4">
-            <!-- Itens inseridos dinamicamente -->
-        </div>
-
-    </main>
-
-    <script>
-        let bookings = JSON.parse(localStorage.getItem('barber_bookings')) || [];
-
-        window.onload = () => {
-            const today = new Date().toISOString().split('T')[0];
-            const dateInput = document.getElementById('filter-date');
-            dateInput.value = today;
-            renderBookings();
-        };
-
-        function renderBookings() {
-            const filterDate = document.getElementById('filter-date').value;
-            const container = document.getElementById('bookings-list');
-            
-            bookings = JSON.parse(localStorage.getItem('barber_bookings')) || [];
-            const dayBookings = bookings.filter(b => b.date === filterDate);
-
-            // Atualiza métricas
-            const activeBookings = dayBookings.filter(b => b.status !== 'cancelado');
-            const totalRevenue = activeBookings.reduce((acc, curr) => acc + (curr.price || 0), 0);
-
-            document.getElementById('metric-total').innerText = dayBookings.length;
-            document.getElementById('metric-active').innerText = activeBookings.length;
-            document.getElementById('metric-revenue').innerText = `R$ ${totalRevenue.toFixed(2).replace('.', ',')}`;
-
-            if (dayBookings.length === 0) {
-                container.innerHTML = `
-                    <div class="text-center text-zinc-500 py-12 card-dark rounded-xl border border-zinc-800">
-                        <i class="fa-regular fa-calendar-xmark text-4xl mb-3 text-zinc-600 block"></i>
-                        Nenhum agendamento encontrado para este dia.
-                    </div>`;
-                return;
-            }
-
-            // Ordena por horário crescente
-            dayBookings.sort((a, b) => a.time.localeCompare(b.time));
-
-            container.innerHTML = dayBookings.map(b => `
-                <div class="card-dark p-5 rounded-xl border border-zinc-800 shadow-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div class="space-y-1">
-                        <div class="flex items-center gap-3">
-                            <span class="gold-text font-bold text-xl">${b.time}</span>
-                            <span class="font-bold text-base text-white">${b.name}</span>
-                            <span class="text-xs px-2.5 py-0.5 rounded-full ${b.status === 'cancelado' ? 'bg-red-900/40 text-red-400' : 'bg-green-900/40 text-green-400'}">
-                                ${b.status}
-                            </span>
-                        </div>
-                        <p class="text-xs text-zinc-300">
-                            <strong>Serviço:</strong> ${b.service} 
-                            <span class="gold-text ml-2 font-semibold">R$ ${b.price.toFixed(2).replace('.', ',')}</span>
-                        </p>
-                        <p class="text-xs text-zinc-400">
-                            <i class="fa-brands fa-whatsapp text-green-500 mr-1"></i> ${b.phone}
-                            ${b.birthdate ? `<span class="ml-3"><i class="fa-solid fa-cake-candles mr-1"></i> Nasc: ${b.birthdate.split('-').reverse().join('/')}</span>` : ''}
-                        </p>
-                        ${b.address ? `<p class="text-xs text-zinc-500"><i class="fa-solid fa-location-dot mr-1"></i> ${b.address}</p>` : ''}
-                    </div>
-
-                    <div class="flex items-center gap-2 w-full sm:w-auto justify-end border-t sm:border-t-0 pt-3 sm:pt-0 border-zinc-800">
-                        ${b.status !== 'cancelado' ? `
-                            <button onclick="cancelBooking(${b.id})" class="text-xs text-red-400 hover:text-red-300 border border-red-900/50 bg-red-950/20 px-3 py-2 rounded-lg transition">
-                                <i class="fa-solid fa-ban mr-1"></i> Cancelar
-                            </button>
-                        ` : ''}
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function cancelBooking(id) {
-            if (confirm("Deseja realmente cancelar este horário?")) {
-                bookings = bookings.map(b => b.id === id ? { ...b, status: 'cancelado' } : b);
-                localStorage.setItem('barber_bookings', JSON.stringify(bookings));
-                renderBookings();
-            }
-        }
-    </script>
-</body>
-</html>
-"""
-
-components.html(html_code, height=850, scrolling=True)
+            with col_btn:
+                st.write("")
+                st.write("")
+                if st.button("❌ Cancelar", key=f"btn_{ev_id}", use_container_width=True):
+                    with st.spinner("Excluindo do Google Agenda..."):
+                        if cancelar_evento(ev_id):
+                            st.success("Cancelado com sucesso!")
+                            st.rerun()
+                        else:
+                            st.error("Erro ao cancelar o evento.")
+            st.write("---")
