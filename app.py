@@ -25,8 +25,11 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# URL da sua automação no Google Apps Script
+WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzQoJrcSlveATovQ-syyGJs49JmdgkhcfkKu3jw2ve2lyN36f5fMrbsJokWzgqxNh95/exec"
+
 # Aplicação completa em HTML/CSS/JS injetada no Streamlit
-html_code = """
+html_code = f"""
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -37,19 +40,19 @@ html_code = """
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
-        body {
+        body {{
             font-family: 'Poppins', sans-serif;
             background-color: #121212;
             color: #E0E0E0;
             margin: 0;
             padding: 0;
-        }
-        .gold-bg { background-color: #D4AF37; }
-        .gold-text { color: #D4AF37; }
-        .gold-border { border-color: #D4AF37; }
-        .card-dark { background-color: #1E1E1E; }
-        .input-dark { background-color: #2A2A2A; color: #FFFFFF; border: 1px solid #333; }
-        .input-dark:focus { border-color: #D4AF37; outline: none; }
+        }}
+        .gold-bg {{ background-color: #D4AF37; }}
+        .gold-text {{ color: #D4AF37; }}
+        .gold-border {{ border-color: #D4AF37; }}
+        .card-dark {{ background-color: #1E1E1E; }}
+        .input-dark {{ background-color: #2A2A2A; color: #FFFFFF; border: 1px solid #333; }}
+        .input-dark:focus {{ border-color: #D4AF37; outline: none; }}
     </style>
 </head>
 <body class="min-h-screen pb-12">
@@ -130,7 +133,7 @@ html_code = """
                         <span class="text-xs text-zinc-400 block">Total a Pagar no Local</span>
                         <span id="total-price" class="text-2xl font-bold gold-text">R$ 0,00</span>
                     </div>
-                    <button type="submit" class="w-full md:w-auto gold-bg text-black font-bold px-8 py-3 rounded-lg hover:bg-yellow-400 transition shadow-lg text-center flex items-center justify-center gap-2">
+                    <button type="submit" id="submit-btn" class="w-full md:w-auto gold-bg text-black font-bold px-8 py-3 rounded-lg hover:bg-yellow-400 transition shadow-lg text-center flex items-center justify-center gap-2">
                         <i class="fa-solid fa-check-circle"></i> Confirmar Agendamento
                     </button>
                 </div>
@@ -168,6 +171,7 @@ html_code = """
             </div>
             <h3 class="text-xl font-bold">Agendamento Realizado!</h3>
             <p class="text-zinc-400 text-sm" id="modal-details"></p>
+            <div id="sync-status" class="text-xs text-yellow-500 py-1"></div>
 
             <div class="pt-4 space-y-2">
                 <a id="google-calendar-link" target="_blank" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg block flex items-center justify-center gap-2 transition">
@@ -181,10 +185,12 @@ html_code = """
     </div>
 
     <script>
+        const WEB_APP_URL = "{WEB_APP_URL}";
+
         const services = [
-            { id: 'corte', name: 'Corte de Cabelo', price: 45.00, duration: '30 min', icon: 'fa-scissors' },
-            { id: 'barba', name: 'Barba Modelada', price: 35.00, duration: '30 min', icon: 'fa-user' },
-            { id: 'combo', name: 'Corte + Barba', price: 70.00, duration: '60 min', icon: 'fa-crown' }
+            {{ id: 'corte', name: 'Corte de Cabelo', price: 45.00, durationMin: 30, duration: '30 min', icon: 'fa-scissors' }},
+            {{ id: 'barba', name: 'Barba Modelada', price: 35.00, durationMin: 30, duration: '30 min', icon: 'fa-user' }},
+            {{ id: 'combo', name: 'Corte + Barba', price: 70.00, durationMin: 60, duration: '60 min', icon: 'fa-crown' }}
         ];
 
         const defaultTimeSlots = ["09:00", "09:45", "10:30", "11:15", "14:00", "14:45", "15:30", "16:15", "17:00", "17:45", "18:30"];
@@ -193,124 +199,164 @@ html_code = """
         let selectedTime = null;
         let bookings = JSON.parse(localStorage.getItem('barber_bookings')) || [];
 
-        window.onload = () => {
+        window.onload = () => {{
             renderServices();
             setMinDate();
             renderTimeSlots();
-        };
+        }};
 
-        function setMinDate() {
+        function setMinDate() {{
             const dateInput = document.getElementById('booking-date');
             const today = new Date().toISOString().split('T')[0];
             dateInput.min = today;
             dateInput.value = today;
             document.getElementById('admin-filter-date').value = today;
-        }
+        }}
 
-        function renderServices() {
+        function renderServices() {{
             const container = document.getElementById('services-container');
             container.innerHTML = services.map(s => `
-                <div onclick="selectService('${s.id}')" id="service-card-${s.id}" 
-                     class="cursor-pointer p-4 rounded-lg border border-zinc-700 transition card-dark hover:border-yellow-500 ${s.id === selectedService.id ? 'gold-border border-2 bg-zinc-800' : ''}">
+                <div onclick="selectService('${{s.id}}')" id="service-card-${{s.id}}" 
+                     class="cursor-pointer p-4 rounded-lg border border-zinc-700 transition card-dark hover:border-yellow-500 ${{s.id === selectedService.id ? 'gold-border border-2 bg-zinc-800' : ''}}">
                     <div class="flex justify-between items-start mb-2">
-                        <i class="fa-solid ${s.icon} text-lg gold-text"></i>
-                        <span class="text-xs bg-zinc-800 px-2 py-0.5 rounded text-zinc-400">${s.duration}</span>
+                        <i class="fa-solid ${{s.icon}} text-lg gold-text"></i>
+                        <span class="text-xs bg-zinc-800 px-2 py-0.5 rounded text-zinc-400">${{s.duration}}</span>
                     </div>
-                    <h4 class="font-bold text-sm mb-1">${s.name}</h4>
-                    <span class="gold-text font-semibold text-sm">R$ ${s.price.toFixed(2).replace('.', ',')}</span>
+                    <h4 class="font-bold text-sm mb-1">${{s.name}}</h4>
+                    <span class="gold-text font-semibold text-sm">R$ ${{s.price.toFixed(2).replace('.', ',')}}</span>
                 </div>
             `).join('');
             updateTotalPrice();
-        }
+        }}
 
-        function selectService(id) {
+        function selectService(id) {{
             selectedService = services.find(s => s.id === id);
             renderServices();
-        }
+        }}
 
-        function updateTotalPrice() {
-            document.getElementById('total-price').innerText = `R$ ${selectedService.price.toFixed(2).replace('.', ',')}`;
-        }
+        function updateTotalPrice() {{
+            document.getElementById('total-price').innerText = `R$ ${{selectedService.price.toFixed(2).replace('.', ',')}}`;
+        }}
 
-        function renderTimeSlots() {
+        function renderTimeSlots() {{
             const dateVal = document.getElementById('booking-date').value;
             const container = document.getElementById('timeslots-container');
             selectedTime = null;
 
-            if (!dateVal) {
+            if (!dateVal) {{
                 container.innerHTML = '<p class="col-span-4 text-xs text-zinc-500">Selecione uma data primeiro.</p>';
                 return;
-            }
+            }}
 
             const occupied = bookings
                 .filter(b => b.date === dateVal && b.status !== 'cancelado')
                 .map(b => b.time);
 
-            container.innerHTML = defaultTimeSlots.map(time => {
+            container.innerHTML = defaultTimeSlots.map(time => {{
                 const isOccupied = occupied.includes(time);
-                if (isOccupied) {
+                if (isOccupied) {{
                     return `
                         <button type="button" disabled class="p-2 rounded-lg bg-zinc-800/40 text-zinc-600 border border-zinc-800 text-xs cursor-not-allowed line-through">
-                            ${time}
+                            ${{time}}
                         </button>`;
-                }
+                }}
                 const isSelected = selectedTime === time;
                 return `
-                    <button type="button" onclick="selectTime('${time}')" id="time-btn-${time.replace(':', '')}" 
-                            class="p-2 rounded-lg border text-xs font-medium transition ${isSelected ? 'gold-bg text-black border-yellow-500 font-bold' : 'input-dark border-zinc-700 hover:border-yellow-500'}">
-                        ${time}
+                    <button type="button" onclick="selectTime('${{time}}')" id="time-btn-${{time.replace(':', '')}}" 
+                            class="p-2 rounded-lg border text-xs font-medium transition ${{isSelected ? 'gold-bg text-black border-yellow-500 font-bold' : 'input-dark border-zinc-700 hover:border-yellow-500'}}">
+                        ${{time}}
                     </button>`;
-            }).join('');
-        }
+            }}).join('');
+        }}
 
-        function selectTime(time) {
+        function selectTime(time) {{
             selectedTime = time;
-            defaultTimeSlots.forEach(t => {
-                const btn = document.getElementById(`time-btn-${t.replace(':', '')}`);
-                if (btn) {
-                    if (t === time) {
+            defaultTimeSlots.forEach(t => {{
+                const btn = document.getElementById(`time-btn-${{t.replace(':', '')}}`);
+                if (btn) {{
+                    if (t === time) {{
                         btn.className = "p-2 rounded-lg border text-xs font-bold gold-bg text-black border-yellow-500";
-                    } else {
+                    }} else {{
                         btn.className = "p-2 rounded-lg border text-xs font-medium input-dark border-zinc-700 hover:border-yellow-500";
-                    }
-                }
-            });
-        }
+                    }}
+                }}
+            }});
+        }}
 
-        function handleBooking(e) {
+        async function handleBooking(e) {{
             e.preventDefault();
 
             const name = document.getElementById('client-name').value;
             const phone = document.getElementById('client-phone').value;
             const date = document.getElementById('booking-date').value;
+            const submitBtn = document.getElementById('submit-btn');
 
-            if (!selectedTime) {
+            if (!selectedTime) {{
                 alert("Por favor, selecione um horário disponível.");
                 return;
-            }
+            }}
 
-            const newBooking = {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Agendando no Google...';
+
+            const newBooking = {{
                 id: Date.now(),
                 name,
                 phone,
                 service: selectedService.name,
                 price: selectedService.price,
+                duration: selectedService.durationMin,
                 date,
                 time: selectedTime,
                 status: 'confirmado'
-            };
+            }};
 
+            // Salva localmente
             bookings.push(newBooking);
             localStorage.setItem('barber_bookings', JSON.stringify(bookings));
 
+            const syncStatusEl = document.getElementById('sync-status');
+            syncStatusEl.innerText = "⏳ Gravando na Google Agenda do barbeiro...";
+
+            // Envia para o Google Apps Script via POST
+            try {{
+                const payload = {{
+                    nome: newBooking.name,
+                    telefone: newBooking.phone,
+                    servico: newBooking.service,
+                    valor: newBooking.price,
+                    duracao: newBooking.duration,
+                    data: newBooking.date,
+                    horario: newBooking.time
+                }};
+
+                await fetch(WEB_APP_URL, {{
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: {{
+                        'Content-Type': 'text/plain;charset=utf-8'
+                    }},
+                    body: JSON.stringify(payload)
+                }});
+
+                syncStatusEl.innerText = "✅ Salvo com sucesso na Google Agenda do barbeiro!";
+                syncStatusEl.className = "text-xs text-green-400 py-1";
+            }} catch (error) {{
+                console.error("Erro ao salvar no Apps Script:", error);
+                syncStatusEl.innerText = "⚠️ Agendado localmente (verifique a conexão com a agenda).";
+                syncStatusEl.className = "text-xs text-yellow-500 py-1";
+            }} finally {{
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fa-solid fa-check-circle"></i> Confirmar Agendamento';
+            }}
+
             const googleUrl = generateGoogleCalendarUrl(newBooking);
-            
             const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('pt-BR');
             document.getElementById('modal-details').innerHTML = `
-                <strong>${newBooking.name}</strong>, seu agendamento para <strong>${newBooking.service}</strong> foi realizado com sucesso!<br><br>
-                📅 <strong>Data:</strong> ${formattedDate}<br>
-                ⏰ <strong>Horário:</strong> ${newBooking.time}<br>
-                💰 <strong>Valor:</strong> R$ ${newBooking.price.toFixed(2).replace('.', ',')}
+                <strong>${{newBooking.name}}</strong>, seu agendamento para <strong>${{newBooking.service}}</strong> foi realizado!<br><br>
+                📅 <strong>Data:</strong> ${{formattedDate}}<br>
+                ⏰ <strong>Horário:</strong> ${{newBooking.time}}<br>
+                💰 <strong>Valor:</strong> R$ ${{newBooking.price.toFixed(2).replace('.', ',')}}
             `;
             document.getElementById('google-calendar-link').href = googleUrl;
             document.getElementById('success-modal').classList.remove('hidden');
@@ -319,88 +365,88 @@ html_code = """
             document.getElementById('booking-form').reset();
             setMinDate();
             renderTimeSlots();
-        }
+        }}
 
-        function generateGoogleCalendarUrl(booking) {
-            const title = encodeURIComponent(`Barbearia Style: ${booking.service}`);
-            const details = encodeURIComponent(`Agendamento de ${booking.service} para ${booking.name}.\nTelefone: ${booking.phone}\nValor: R$ ${booking.price.toFixed(2)}`);
+        function generateGoogleCalendarUrl(booking) {{
+            const title = encodeURIComponent(`Barbearia Style: ${{booking.service}}`);
+            const details = encodeURIComponent(`Agendamento de ${{booking.service}} para ${{booking.name}}.\\nTelefone: ${{booking.phone}}\\nValor: R$ ${{booking.price.toFixed(2)}}`);
             const location = encodeURIComponent("Barbearia Style");
 
             const [year, month, day] = booking.date.split('-');
             const [hour, minute] = booking.time.split(':');
             
             const startDate = new Date(Date.UTC(year, month - 1, day, hour, minute));
-            const endDate = new Date(startDate.getTime() + 45 * 60000);
+            const endDate = new Date(startDate.getTime() + (booking.duration || 45) * 60000);
 
             const isoStart = startDate.toISOString().replace(/-|:|\.\d\d\d/g, "");
             const isoEnd = endDate.toISOString().replace(/-|:|\.\d\d\d/g, "");
 
-            return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${isoStart}/${isoEnd}&details=${details}&location=${location}`;
-        }
+            return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${{title}}&dates=${{isoStart}}/${{isoEnd}}&details=${{details}}&location=${{location}}`;
+        }}
 
-        function closeModal() {
+        function closeModal() {{
             document.getElementById('success-modal').classList.add('hidden');
             document.getElementById('success-modal').classList.remove('flex');
-        }
+        }}
 
-        function toggleView() {
+        function toggleView() {{
             const clientView = document.getElementById('client-view');
             const adminView = document.getElementById('admin-view');
             const btn = document.getElementById('toggle-view-btn');
 
-            if (clientView.classList.contains('hidden')) {
+            if (clientView.classList.contains('hidden')) {{
                 clientView.classList.remove('hidden');
                 adminView.classList.add('hidden');
                 btn.innerHTML = '<i class="fa-solid fa-user-shield mr-1"></i> Painel do Barbeiro';
-            } else {
+            }} else {{
                 clientView.classList.add('hidden');
                 adminView.classList.remove('hidden');
                 btn.innerHTML = '<i class="fa-solid fa-scissors mr-1"></i> Área do Cliente';
                 renderAdminBookings();
-            }
-        }
+            }}
+        }}
 
-        function renderAdminBookings() {
+        function renderAdminBookings() {{
             const filterDate = document.getElementById('admin-filter-date').value;
             const container = document.getElementById('admin-bookings-list');
             
             const list = bookings.filter(b => b.date === filterDate);
 
-            if (list.length === 0) {
+            if (list.length === 0) {{
                 container.innerHTML = '<p class="text-center text-zinc-500 py-8 card-dark rounded-xl border border-zinc-800">Nenhum agendamento para esta data.</p>';
                 return;
-            }
+            }}
 
             container.innerHTML = list.map(b => `
                 <div class="card-dark p-4 rounded-xl border border-zinc-800 flex justify-between items-center">
                     <div>
                         <div class="flex items-center gap-2">
-                            <span class="gold-text font-bold text-lg">${b.time}</span>
-                            <span class="font-bold">${b.name}</span>
-                            <span class="text-xs px-2 py-0.5 rounded ${b.status === 'cancelado' ? 'bg-red-900/50 text-red-400' : 'bg-green-900/50 text-green-400'}">${b.status}</span>
+                            <span class="gold-text font-bold text-lg">${{b.time}}</span>
+                            <span class="font-bold">${{b.name}}</span>
+                            <span class="text-xs px-2 py-0.5 rounded ${{b.status === 'cancelado' ? 'bg-red-900/50 text-red-400' : 'bg-green-900/50 text-green-400'}}">${{b.status}}</span>
                         </div>
-                        <p class="text-xs text-zinc-400 mt-1">Serviço: ${b.service} | Valor: R$ ${b.price.toFixed(2).replace('.', ',')}</p>
-                        <p class="text-xs text-zinc-500">Contato: ${b.phone}</p>
+                        <p class="text-xs text-zinc-400 mt-1">Serviço: ${{b.service}} | Valor: R$ ${{b.price.toFixed(2).replace('.', ',')}}</p>
+                        <p class="text-xs text-zinc-500">Contato: ${{b.phone}}</p>
                     </div>
                     <div class="flex gap-2">
-                        ${b.status !== 'cancelado' ? `
-                            <button onclick="cancelBooking(${b.id})" class="text-xs text-red-400 hover:text-red-300 p-2 rounded bg-zinc-800">
+                        ${{b.status !== 'cancelado' ? `
+                            <button onclick="cancelBooking(${{b.id}})" class="text-xs text-red-400 hover:text-red-300 p-2 rounded bg-zinc-800">
                                 <i class="fa-solid fa-ban"></i> Cancelar
                             </button>
-                        ` : ''}
+                        ` : ''}}
                     </div>
                 </div>
             `).join('');
-        }
+        }}
 
-        function cancelBooking(id) {
-            if (confirm("Deseja realmente cancelar este agendamento?")) {
-                bookings = bookings.map(b => b.id === id ? { ...b, status: 'cancelado' } : b);
+        function cancelBooking(id) {{
+            if (confirm("Deseja realmente cancelar este agendamento?")) {{
+                bookings = bookings.map(b => b.id === id ? {{ ...b, status: 'cancelado' }} : b);
                 localStorage.setItem('barber_bookings', JSON.stringify(bookings));
                 renderAdminBookings();
                 renderTimeSlots();
-            }
-        }
+            }}
+        }}
     </script>
 </body>
 </html>
