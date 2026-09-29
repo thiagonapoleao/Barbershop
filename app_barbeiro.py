@@ -71,6 +71,9 @@ html_code = """
             <div class="card-dark p-2 px-3 rounded-xl border border-zinc-800 flex items-center gap-3">
                 <label class="text-xs text-zinc-400">Data:</label>
                 <input type="date" id="filter-date" onchange="renderBookings()" class="p-2 rounded-lg input-dark text-xs">
+                <button onclick="renderBookings()" class="text-xs gold-text hover:text-yellow-400 p-1.5" title="Atualizar">
+                    <i class="fa-solid fa-arrows-rotate"></i>
+                </button>
             </div>
         </div>
 
@@ -98,7 +101,8 @@ html_code = """
     </main>
 
     <script>
-        let bookings = JSON.parse(localStorage.getItem('barber_bookings')) || [];
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzQoJrcSlveATovQ-syyGJs49JmdgkhcfkKu3jw2ve2lyN36f5fMrbsJokWzgqxNh95/exec";
+        let bookings = [];
 
         window.onload = () => {
             const today = new Date().toISOString().split('T')[0];
@@ -107,22 +111,71 @@ html_code = """
             renderBookings();
         };
 
-        function renderBookings() {
+        async function renderBookings() {
             const filterDate = document.getElementById('filter-date').value;
             const container = document.getElementById('bookings-list');
-            
-            bookings = JSON.parse(localStorage.getItem('barber_bookings')) || [];
-            const dayBookings = bookings.filter(b => b.date === filterDate);
+
+            if (!filterDate) return;
+
+            container.innerHTML = `
+                <div class="text-center text-zinc-400 py-12 card-dark rounded-xl border border-zinc-800">
+                    <i class="fa-solid fa-circle-notch fa-spin text-2xl gold-text mb-3 block"></i>
+                    Carregando agendamentos do Google Agenda...
+                </div>`;
+
+            try {
+                const response = await fetch(`${WEB_APP_URL}?action=get_bookings&date=${filterDate}`);
+                const data = await response.json();
+
+                if (data.status === 'ok') {
+                    bookings = data.bookings.map(item => {
+                        const desc = item.description || '';
+                        let phone = '';
+                        let service = '';
+                        let price = 0;
+
+                        desc.split('\\n').forEach(line => {
+                            if (line.includes('WhatsApp:') || line.includes('Telefone:')) {
+                                phone = line.split(':')[1]?.trim() || '';
+                            }
+                            if (line.includes('Serviço:')) {
+                                service = line.split(':')[1]?.split('(')[0]?.trim() || '';
+                            }
+                            if (line.includes('R$')) {
+                                const valStr = line.split('R$')[1]?.trim()?.replace(',', '.') || '0';
+                                price = parseFloat(valStr) || 0;
+                            }
+                        });
+
+                        return {
+                            id: item.id,
+                            title: item.title,
+                            time: item.time,
+                            name: item.title.replace(/^💈\\s*/, '').split(' - ')[1] || item.title,
+                            service: service || item.title.replace(/^💈\\s*/, '').split(' - ')[0] || 'Serviço',
+                            phone: phone || 'Não informado',
+                            price: price,
+                            status: 'confirmado'
+                        };
+                    });
+                } else {
+                    bookings = [];
+                }
+            } catch (err) {
+                console.error("Erro ao buscar no Google Agenda:", err);
+                bookings = JSON.parse(localStorage.getItem('barber_bookings')) || [];
+                bookings = bookings.filter(b => b.date === filterDate);
+            }
 
             // Atualiza métricas
-            const activeBookings = dayBookings.filter(b => b.status !== 'cancelado');
+            const activeBookings = bookings.filter(b => b.status !== 'cancelado');
             const totalRevenue = activeBookings.reduce((acc, curr) => acc + (curr.price || 0), 0);
 
-            document.getElementById('metric-total').innerText = dayBookings.length;
+            document.getElementById('metric-total').innerText = bookings.length;
             document.getElementById('metric-active').innerText = activeBookings.length;
             document.getElementById('metric-revenue').innerText = `R$ ${totalRevenue.toFixed(2).replace('.', ',')}`;
 
-            if (dayBookings.length === 0) {
+            if (bookings.length === 0) {
                 container.innerHTML = `
                     <div class="text-center text-zinc-500 py-12 card-dark rounded-xl border border-zinc-800">
                         <i class="fa-regular fa-calendar-xmark text-4xl mb-3 text-zinc-600 block"></i>
@@ -132,9 +185,9 @@ html_code = """
             }
 
             // Ordena por horário crescente
-            dayBookings.sort((a, b) => a.time.localeCompare(b.time));
+            bookings.sort((a, b) => a.time.localeCompare(b.time));
 
-            container.innerHTML = dayBookings.map(b => `
+            container.innerHTML = bookings.map(b => `
                 <div class="card-dark p-5 rounded-xl border border-zinc-800 shadow-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div class="space-y-1">
                         <div class="flex items-center gap-3">
@@ -150,14 +203,12 @@ html_code = """
                         </p>
                         <p class="text-xs text-zinc-400">
                             <i class="fa-brands fa-whatsapp text-green-500 mr-1"></i> ${b.phone}
-                            ${b.birthdate ? `<span class="ml-3"><i class="fa-solid fa-cake-candles mr-1"></i> Nasc: ${b.birthdate.split('-').reverse().join('/')}</span>` : ''}
                         </p>
-                        ${b.address ? `<p class="text-xs text-zinc-500"><i class="fa-solid fa-location-dot mr-1"></i> ${b.address}</p>` : ''}
                     </div>
 
                     <div class="flex items-center gap-2 w-full sm:w-auto justify-end border-t sm:border-t-0 pt-3 sm:pt-0 border-zinc-800">
                         ${b.status !== 'cancelado' ? `
-                            <button onclick="cancelBooking(${b.id})" class="text-xs text-red-400 hover:text-red-300 border border-red-900/50 bg-red-950/20 px-3 py-2 rounded-lg transition">
+                            <button onclick="cancelBooking('${b.id}')" class="text-xs text-red-400 hover:text-red-300 border border-red-900/50 bg-red-950/20 px-3 py-2 rounded-lg transition">
                                 <i class="fa-solid fa-ban mr-1"></i> Cancelar
                             </button>
                         ` : ''}
@@ -166,10 +217,24 @@ html_code = """
             `).join('');
         }
 
-        function cancelBooking(id) {
+        async function cancelBooking(id) {
             if (confirm("Deseja realmente cancelar este horário?")) {
-                bookings = bookings.map(b => b.id === id ? { ...b, status: 'cancelado' } : b);
-                localStorage.setItem('barber_bookings', JSON.stringify(bookings));
+                try {
+                    await fetch(WEB_APP_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify({ action: 'cancel', eventId: id })
+                    });
+                } catch (e) {
+                    console.error("Erro ao cancelar no Apps Script:", e);
+                }
+
+                // Remove do backup local se existir
+                let localBookings = JSON.parse(localStorage.getItem('barber_bookings')) || [];
+                localBookings = localBookings.map(b => String(b.id) === String(id) ? { ...b, status: 'cancelado' } : b);
+                localStorage.setItem('barber_bookings', JSON.stringify(localBookings));
+
                 renderBookings();
             }
         }
