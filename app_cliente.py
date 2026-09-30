@@ -20,6 +20,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# URL da automação conectada à sua planilha
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzQoJrcSlveATovQ-syyGJs49JmdgkhcfkKu3jw2ve2lyN36f5fMrbsJokWzgqxNh95/exec"
 
 html_code = f"""
@@ -68,7 +69,7 @@ html_code = f"""
 
     <main class="max-w-2xl mx-auto px-4 mt-8">
 
-        <!-- ================= TELA DE LOGIN / CADASTRO ================= -->
+        <!-- ================= 1. TELA DE AUTENTICAÇÃO (LOGIN / CADASTRO) ================= -->
         <div id="auth-section" class="space-y-6">
             
             <!-- FORMULÁRIO DE LOGIN -->
@@ -109,7 +110,7 @@ html_code = f"""
                         <i class="fa-solid fa-user-plus"></i>
                     </div>
                     <h2 class="text-2xl font-bold">Criar Conta</h2>
-                    <p class="text-zinc-400 text-xs mt-1">Seus dados serão salvos com segurança</p>
+                    <p class="text-zinc-400 text-xs mt-1">Seu cadastro será registrado na planilha com segurança</p>
                 </div>
 
                 <form onsubmit="handleRegister(event)" class="space-y-4">
@@ -131,7 +132,7 @@ html_code = f"""
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-zinc-800 pt-4">
                         <div>
-                            <label class="block text-xs text-zinc-400 mb-1">E-mail (Login) *</label>
+                            <label class="block text-xs text-zinc-400 mb-1">E-mail (Seu Usuário) *</label>
                             <input type="email" id="reg-email" required placeholder="seuemail@exemplo.com" class="w-full p-3 rounded-lg input-dark text-sm">
                         </div>
                         <div>
@@ -153,7 +154,7 @@ html_code = f"""
 
         </div>
 
-        <!-- ================= TELA DE AGENDAMENTO (USUÁRIO LOGADO) ================= -->
+        <!-- ================= 2. TELA DE AGENDAMENTO (USUÁRIO LOGADO) ================= -->
         <div id="booking-section" class="hidden space-y-6">
 
             <!-- Card com dados pré-definidos do cliente logado -->
@@ -279,7 +280,7 @@ html_code = f"""
             e.preventDefault();
             const btn = document.getElementById('btn-register');
             btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Cadastrando na planilha...';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Gravando na Planilha...';
 
             const name = document.getElementById('reg-name').value.trim();
             const phone = document.getElementById('reg-phone').value.trim();
@@ -297,14 +298,15 @@ html_code = f"""
                     senha: password
                 }};
 
+                // Envia como application/x-www-form-urlencoded para o Google Apps Script gravar com 100% de confiabilidade
                 await fetch(WEB_APP_URL, {{
                     method: 'POST',
                     mode: 'no-cors',
-                    headers: {{ 'Content-Type': 'text/plain;charset=utf-8' }},
-                    body: JSON.stringify(payload)
+                    headers: {{ 'Content-Type': 'application/x-www-form-urlencoded' }},
+                    body: new URLSearchParams(payload)
                 }});
 
-                // Salva a sessão localmente
+                // Salva a sessão no navegador para entrar direto
                 currentUser = {{ name, phone, birthdate, email }};
                 localStorage.setItem('barber_current_client', JSON.stringify(currentUser));
                 showBookingView();
@@ -342,7 +344,7 @@ html_code = f"""
                     alert(res.message || "E-mail ou senha inválidos.");
                 }}
             }} catch (error) {{
-                alert("Erro ao conectar à planilha de clientes. Verifique sua conexão.");
+                alert("Erro ao consultar a planilha de clientes. Verifique sua conexão.");
             }} finally {{
                 btn.disabled = false;
                 btn.innerHTML = 'Entrar';
@@ -471,7 +473,7 @@ html_code = f"""
             const date = document.getElementById('booking-date').value;
 
             const newBooking = {{
-                name: currentUser.name,
+                nome: currentUser.name,
                 telefone: currentUser.phone,
                 email: currentUser.email,
                 servico: selectedService.name,
@@ -488,8 +490,8 @@ html_code = f"""
                 await fetch(WEB_APP_URL, {{
                     method: 'POST',
                     mode: 'no-cors',
-                    headers: {{ 'Content-Type': 'text/plain;charset=utf-8' }},
-                    body: JSON.stringify(newBooking)
+                    headers: {{ 'Content-Type': 'application/x-www-form-urlencoded' }},
+                    body: new URLSearchParams(newBooking)
                 }});
 
                 syncStatusEl.innerText = "✅ Salvo com sucesso na Google Agenda do barbeiro!";
@@ -505,7 +507,7 @@ html_code = f"""
             const googleUrl = generateGoogleCalendarUrl(newBooking);
             const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('pt-BR');
             document.getElementById('modal-details').innerHTML = `
-                <strong>${{newBooking.name}}</strong>, seu agendamento foi realizado!<br><br>
+                <strong>${{newBooking.nome}}</strong>, seu agendamento foi realizado!<br><br>
                 ✂️ <strong>Serviço:</strong> ${{newBooking.servico}}<br>
                 📅 <strong>Data:</strong> ${{formattedDate}}<br>
                 ⏰ <strong>Horário:</strong> ${{newBooking.horario}}<br>
@@ -520,7 +522,7 @@ html_code = f"""
 
         function generateGoogleCalendarUrl(booking) {{
             const title = encodeURIComponent(`Barbearia Style: ${{booking.servico}}`);
-            const details = encodeURIComponent(`Agendamento de ${{booking.servico}} para ${{booking.name}}.\\nTelefone: ${{booking.telefone}}\\nE-mail: ${{booking.email}}\\nValor: R$ ${{booking.valor.toFixed(2)}}`);
+            const details = encodeURIComponent(`Agendamento de ${{booking.servico}} para ${{booking.nome}}.\\nTelefone: ${{booking.telefone}}\\nE-mail: ${{booking.email}}\\nValor: R$ ${{booking.valor.toFixed(2)}}`);
             const location = encodeURIComponent("Barbearia Style");
 
             const [year, month, day] = booking.data.split('-');
