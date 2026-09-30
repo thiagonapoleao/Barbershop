@@ -20,7 +20,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# URL da automação conectada à sua planilha
+# URL da automação do Google Apps Script
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzQoJrcSlveATovQ-syyGJs49JmdgkhcfkKu3jw2ve2lyN36f5fMrbsJokWzgqxNh95/exec"
 
 html_code = f"""
@@ -289,29 +289,29 @@ html_code = f"""
             const password = document.getElementById('reg-password').value;
 
             try {{
-                const payload = {{
+                const params = new URLSearchParams({{
                     action: "register",
                     nome: name,
                     telefone: phone,
                     nascimento: birthdate,
                     email: email,
                     senha: password
-                }};
-
-                // Envia como application/x-www-form-urlencoded para o Google Apps Script gravar com 100% de confiabilidade
-                await fetch(WEB_APP_URL, {{
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: {{ 'Content-Type': 'application/x-www-form-urlencoded' }},
-                    body: new URLSearchParams(payload)
                 }});
 
-                // Salva a sessão no navegador para entrar direto
-                currentUser = {{ name, phone, birthdate, email }};
-                localStorage.setItem('barber_current_client', JSON.stringify(currentUser));
-                showBookingView();
+                // Envia via GET garantindo que o Google Sheets grave os dados sem erro de CORS
+                const response = await fetch(`${{WEB_APP_URL}}?${{params.toString()}}`);
+                const res = await response.json();
+
+                if (res.status === 'success') {{
+                    currentUser = {{ name, phone, birthdate, email }};
+                    localStorage.setItem('barber_current_client', JSON.stringify(currentUser));
+                    showBookingView();
+                }} else {{
+                    alert(res.message || "Erro ao cadastrar na planilha.");
+                }}
             }} catch (error) {{
-                alert("Erro ao realizar cadastro. Tente novamente.");
+                console.error("Erro no cadastro:", error);
+                alert("Erro ao conectar à planilha. Verifique se publicou a 'Nova versão' no Apps Script.");
             }} finally {{
                 btn.disabled = false;
                 btn.innerHTML = 'Finalizar Cadastro';
@@ -490,8 +490,8 @@ html_code = f"""
                 await fetch(WEB_APP_URL, {{
                     method: 'POST',
                     mode: 'no-cors',
-                    headers: {{ 'Content-Type': 'application/x-www-form-urlencoded' }},
-                    body: new URLSearchParams(newBooking)
+                    headers: {{ 'Content-Type': 'text/plain;charset=utf-8' }},
+                    body: JSON.stringify(newBooking)
                 }});
 
                 syncStatusEl.innerText = "✅ Salvo com sucesso na Google Agenda do barbeiro!";
