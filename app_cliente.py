@@ -20,7 +20,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# URL da sua automação no Google Apps Script mantida
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzQoJrcSlveATovQ-syyGJs49JmdgkhcfkKu3jw2ve2lyN36f5fMrbsJokWzgqxNh95/exec"
 
 html_code = f"""
@@ -69,7 +68,7 @@ html_code = f"""
 
     <main class="max-w-2xl mx-auto px-4 mt-8">
 
-        <!-- ================= 1. TELA DE AUTENTICAÇÃO (LOGIN / CADASTRO) ================= -->
+        <!-- ================= TELA DE LOGIN / CADASTRO ================= -->
         <div id="auth-section" class="space-y-6">
             
             <!-- FORMULÁRIO DE LOGIN -->
@@ -79,20 +78,20 @@ html_code = f"""
                         <i class="fa-solid fa-lock"></i>
                     </div>
                     <h2 class="text-2xl font-bold">Acesse sua Conta</h2>
-                    <p class="text-zinc-400 text-xs mt-1">Entre com seu usuário e senha para agendar</p>
+                    <p class="text-zinc-400 text-xs mt-1">Utilize seu e-mail e senha para agendar</p>
                 </div>
 
                 <form onsubmit="handleLogin(event)" class="space-y-4">
                     <div>
-                        <label class="block text-xs text-zinc-400 mb-1">Usuário *</label>
-                        <input type="text" id="login-username" required placeholder="Seu nome de usuário" class="w-full p-3 rounded-lg input-dark text-sm">
+                        <label class="block text-xs text-zinc-400 mb-1">E-mail *</label>
+                        <input type="email" id="login-email" required placeholder="seuemail@exemplo.com" class="w-full p-3 rounded-lg input-dark text-sm">
                     </div>
                     <div>
                         <label class="block text-xs text-zinc-400 mb-1">Senha *</label>
                         <input type="password" id="login-password" required placeholder="••••••••" class="w-full p-3 rounded-lg input-dark text-sm">
                     </div>
 
-                    <button type="submit" class="w-full gold-bg text-black font-bold py-3 rounded-lg hover:bg-yellow-400 transition mt-2">
+                    <button type="submit" id="btn-login" class="w-full gold-bg text-black font-bold py-3 rounded-lg hover:bg-yellow-400 transition mt-2 flex items-center justify-center gap-2">
                         Entrar
                     </button>
                 </form>
@@ -110,7 +109,7 @@ html_code = f"""
                         <i class="fa-solid fa-user-plus"></i>
                     </div>
                     <h2 class="text-2xl font-bold">Criar Conta</h2>
-                    <p class="text-zinc-400 text-xs mt-1">Cadastre seus dados uma vez para agendar sempre com facilidade</p>
+                    <p class="text-zinc-400 text-xs mt-1">Seus dados serão salvos com segurança</p>
                 </div>
 
                 <form onsubmit="handleRegister(event)" class="space-y-4">
@@ -130,15 +129,10 @@ html_code = f"""
                         </div>
                     </div>
 
-                    <div>
-                        <label class="block text-xs text-zinc-400 mb-1">Endereço Completo *</label>
-                        <input type="text" id="reg-address" required placeholder="Rua, número, bairro e cidade" class="w-full p-3 rounded-lg input-dark text-sm">
-                    </div>
-
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-zinc-800 pt-4">
                         <div>
-                            <label class="block text-xs text-zinc-400 mb-1">Usuário para Acesso *</label>
-                            <input type="text" id="reg-username" required placeholder="Ex: carloso" class="w-full p-3 rounded-lg input-dark text-sm">
+                            <label class="block text-xs text-zinc-400 mb-1">E-mail (Login) *</label>
+                            <input type="email" id="reg-email" required placeholder="seuemail@exemplo.com" class="w-full p-3 rounded-lg input-dark text-sm">
                         </div>
                         <div>
                             <label class="block text-xs text-zinc-400 mb-1">Senha *</label>
@@ -146,7 +140,7 @@ html_code = f"""
                         </div>
                     </div>
 
-                    <button type="submit" class="w-full gold-bg text-black font-bold py-3 rounded-lg hover:bg-yellow-400 transition mt-3">
+                    <button type="submit" id="btn-register" class="w-full gold-bg text-black font-bold py-3 rounded-lg hover:bg-yellow-400 transition mt-3 flex items-center justify-center gap-2">
                         Finalizar Cadastro
                     </button>
                 </form>
@@ -159,7 +153,7 @@ html_code = f"""
 
         </div>
 
-        <!-- ================= 2. TELA DE AGENDAMENTO (USUÁRIO LOGADO) ================= -->
+        <!-- ================= TELA DE AGENDAMENTO (USUÁRIO LOGADO) ================= -->
         <div id="booking-section" class="hidden space-y-6">
 
             <!-- Card com dados pré-definidos do cliente logado -->
@@ -168,13 +162,13 @@ html_code = f"""
                     <span class="text-zinc-500 block">Cliente Conectado:</span>
                     <strong id="display-client-name" class="text-sm gold-text"></strong>
                     <span id="display-client-phone" class="text-zinc-400 ml-2"></span>
-                    <p id="display-client-address" class="text-zinc-500 text-[11px] mt-0.5"></p>
+                    <p id="display-client-info" class="text-zinc-500 text-[11px] mt-0.5"></p>
                 </div>
-                <span class="bg-green-900/40 text-green-400 px-2 py-1 rounded text-[11px]">Conectado</span>
+                <span class="bg-green-900/40 text-green-400 px-2.5 py-1 rounded-full text-[11px] font-medium">Conta Ativa</span>
             </div>
 
             <form onsubmit="handleBooking(event)" class="space-y-6">
-                <!-- Escolha de Serviços -->
+                <!-- 1. Escolha de Serviços -->
                 <div class="card-dark p-6 rounded-xl border border-zinc-800 shadow-lg">
                     <h3 class="text-lg font-semibold mb-4 flex items-center gold-text">
                         <i class="fa-solid fa-cut mr-2"></i> 1. Escolha o Serviço
@@ -182,7 +176,7 @@ html_code = f"""
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4" id="services-container"></div>
                 </div>
 
-                <!-- Seleção de Data e Horário -->
+                <!-- 2. Seleção de Data e Horário -->
                 <div class="card-dark p-6 rounded-xl border border-zinc-800 shadow-lg">
                     <h3 class="text-lg font-semibold mb-4 flex items-center gold-text">
                         <i class="fa-solid fa-calendar-days mr-2"></i> 2. Data e Horário
@@ -199,7 +193,7 @@ html_code = f"""
                     </div>
                 </div>
 
-                <!-- Confirmação -->
+                <!-- 3. Confirmação -->
                 <div class="card-dark p-6 rounded-xl border border-zinc-800 shadow-lg flex flex-col sm:flex-row justify-between items-center gap-4">
                     <div>
                         <span class="text-xs text-zinc-400 block">Total no Local</span>
@@ -255,10 +249,9 @@ html_code = f"""
             checkExistingSession();
             renderServices();
             setMinDate();
-            renderTimeSlots();
         }};
 
-        /* ---------- GESTÃO DE AUTENTICAÇÃO ---------- */
+        /* ---------- GESTÃO DE AUTENTICAÇÃO COM PLANILHA ---------- */
         function checkExistingSession() {{
             const session = localStorage.getItem('barber_current_client');
             if (session) {{
@@ -282,58 +275,78 @@ html_code = f"""
             document.getElementById('register-box').classList.remove('hidden');
         }}
 
-        function handleRegister(e) {{
+        async function handleRegister(e) {{
             e.preventDefault();
+            const btn = document.getElementById('btn-register');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Cadastrando na planilha...';
 
             const name = document.getElementById('reg-name').value.trim();
             const phone = document.getElementById('reg-phone').value.trim();
             const birthdate = document.getElementById('reg-birthdate').value;
-            const address = document.getElementById('reg-address').value.trim();
-            const username = document.getElementById('reg-username').value.trim().toLowerCase();
+            const email = document.getElementById('reg-email').value.trim().toLowerCase();
             const password = document.getElementById('reg-password').value;
 
-            const registeredUsers = JSON.parse(localStorage.getItem('barber_registered_users')) || [];
+            try {{
+                const payload = {{
+                    action: "register",
+                    nome: name,
+                    telefone: phone,
+                    nascimento: birthdate,
+                    email: email,
+                    senha: password
+                }};
 
-            if (registeredUsers.some(u => u.username === username)) {{
-                alert("Este nome de usuário já está cadastrado. Escolha outro.");
-                return;
+                await fetch(WEB_APP_URL, {{
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: {{ 'Content-Type': 'text/plain;charset=utf-8' }},
+                    body: JSON.stringify(payload)
+                }});
+
+                // Salva a sessão localmente
+                currentUser = {{ name, phone, birthdate, email }};
+                localStorage.setItem('barber_current_client', JSON.stringify(currentUser));
+                showBookingView();
+            }} catch (error) {{
+                alert("Erro ao realizar cadastro. Tente novamente.");
+            }} finally {{
+                btn.disabled = false;
+                btn.innerHTML = 'Finalizar Cadastro';
             }}
-
-            const newUser = {{
-                id: Date.now(),
-                name,
-                phone,
-                birthdate,
-                address,
-                username,
-                password
-            }};
-
-            registeredUsers.push(newUser);
-            localStorage.setItem('barber_registered_users', JSON.stringify(registeredUsers));
-
-            currentUser = newUser;
-            localStorage.setItem('barber_current_client', JSON.stringify(currentUser));
-            showBookingView();
         }}
 
-        function handleLogin(e) {{
+        async function handleLogin(e) {{
             e.preventDefault();
+            const btn = document.getElementById('btn-login');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Validando acesso...';
 
-            const username = document.getElementById('login-username').value.trim().toLowerCase();
+            const email = document.getElementById('login-email').value.trim().toLowerCase();
             const password = document.getElementById('login-password').value;
 
-            const registeredUsers = JSON.parse(localStorage.getItem('barber_registered_users')) || [];
-            const user = registeredUsers.find(u => u.username === username && u.password === password);
+            try {{
+                const response = await fetch(`${{WEB_APP_URL}}?action=login&email=${{encodeURIComponent(email)}}&password=${{encodeURIComponent(password)}}`);
+                const res = await response.json();
 
-            if (!user) {{
-                alert("Usuário ou senha incorretos.");
-                return;
+                if (res.status === 'ok') {{
+                    currentUser = {{
+                        name: res.user.nome,
+                        phone: res.user.telefone,
+                        birthdate: res.user.nascimento,
+                        email: res.user.email
+                    }};
+                    localStorage.setItem('barber_current_client', JSON.stringify(currentUser));
+                    showBookingView();
+                }} else {{
+                    alert(res.message || "E-mail ou senha inválidos.");
+                }}
+            }} catch (error) {{
+                alert("Erro ao conectar à planilha de clientes. Verifique sua conexão.");
+            }} finally {{
+                btn.disabled = false;
+                btn.innerHTML = 'Entrar';
             }}
-
-            currentUser = user;
-            localStorage.setItem('barber_current_client', JSON.stringify(currentUser));
-            showBookingView();
         }}
 
         function logout() {{
@@ -348,10 +361,14 @@ html_code = f"""
             document.getElementById('user-pill').classList.remove('hidden');
             document.getElementById('user-pill').classList.add('flex');
 
-            document.getElementById('user-greeting').innerText = `Olá, ${{currentUser.name.split(' ')[0]}}`;
+            const firstName = currentUser.name ? currentUser.name.split(' ')[0] : 'Cliente';
+            document.getElementById('user-greeting').innerText = `Olá, ${{firstName}}`;
             document.getElementById('display-client-name').innerText = currentUser.name;
             document.getElementById('display-client-phone').innerText = currentUser.phone;
-            document.getElementById('display-client-address').innerText = `📍 ${{currentUser.address}} (Nasc: ${{currentUser.birthdate.split('-').reverse().join('/')}})`;
+            
+            const nascFormatted = currentUser.birthdate ? currentUser.birthdate.toString().split('T')[0].split('-').reverse().join('/') : '';
+            document.getElementById('display-client-info').innerText = `📧 ${{currentUser.email}} | 🎂 ${{nascFormatted}}`;
+            renderTimeSlots();
         }}
 
         /* ---------- FLUXO DE AGENDAMENTO ---------- */
@@ -381,23 +398,32 @@ html_code = f"""
         function selectService(id) {{
             selectedService = services.find(s => s.id === id);
             renderServices();
+            renderTimeSlots();
         }}
 
         function updateTotalPrice() {{
             document.getElementById('total-price').innerText = `R$ ${{selectedService.price.toFixed(2).replace('.', ',')}}`;
         }}
 
-        function renderTimeSlots() {{
+        async function renderTimeSlots() {{
             const dateVal = document.getElementById('booking-date').value;
             const container = document.getElementById('timeslots-container');
             selectedTime = null;
 
             if (!dateVal) return;
 
-            const allBookings = JSON.parse(localStorage.getItem('barber_bookings')) || [];
-            const occupied = allBookings
-                .filter(b => b.date === dateVal && b.status !== 'cancelado')
-                .map(b => b.time);
+            container.innerHTML = '<p class="col-span-4 text-xs text-zinc-400 py-2"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Consultando agenda...</p>';
+
+            let occupied = [];
+            try {{
+                const res = await fetch(`${{WEB_APP_URL}}?action=get_busy&date=${{dateVal}}`);
+                const data = await res.json();
+                if (data.status === 'ok') {{
+                    occupied = data.busy.map(b => b.start);
+                }}
+            }} catch(e) {{
+                console.warn(e);
+            }}
 
             container.innerHTML = defaultTimeSlots.map(time => {{
                 const isOccupied = occupied.includes(time);
@@ -440,49 +466,30 @@ html_code = f"""
 
             const submitBtn = document.getElementById('submit-btn');
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando na Agenda...';
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Agendando no Google...';
 
             const date = document.getElementById('booking-date').value;
 
             const newBooking = {{
-                id: Date.now(),
                 name: currentUser.name,
-                phone: currentUser.phone,
-                birthdate: currentUser.birthdate,
-                address: currentUser.address,
-                service: selectedService.name,
-                price: selectedService.price,
-                duration: selectedService.durationMin,
-                date: date,
-                time: selectedTime,
-                status: 'confirmado'
+                telefone: currentUser.phone,
+                email: currentUser.email,
+                servico: selectedService.name,
+                valor: selectedService.price,
+                duracao: selectedService.durationMin,
+                data: date,
+                horario: selectedTime
             }};
-
-            // Salva na lista de agendamentos
-            const allBookings = JSON.parse(localStorage.getItem('barber_bookings')) || [];
-            allBookings.push(newBooking);
-            localStorage.setItem('barber_bookings', JSON.stringify(allBookings));
 
             const syncStatusEl = document.getElementById('sync-status');
             syncStatusEl.innerText = "⏳ Gravando na Google Agenda do barbeiro...";
 
-            // Dispara para o Google Apps Script com a WEB_APP_URL informada
             try {{
-                const payload = {{
-                    nome: newBooking.name,
-                    telefone: newBooking.phone,
-                    servico: newBooking.service,
-                    valor: newBooking.price,
-                    duracao: newBooking.duration,
-                    data: newBooking.date,
-                    horario: newBooking.time
-                }};
-
                 await fetch(WEB_APP_URL, {{
                     method: 'POST',
                     mode: 'no-cors',
                     headers: {{ 'Content-Type': 'text/plain;charset=utf-8' }},
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(newBooking)
                 }});
 
                 syncStatusEl.innerText = "✅ Salvo com sucesso na Google Agenda do barbeiro!";
@@ -499,10 +506,10 @@ html_code = f"""
             const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('pt-BR');
             document.getElementById('modal-details').innerHTML = `
                 <strong>${{newBooking.name}}</strong>, seu agendamento foi realizado!<br><br>
-                ✂️ <strong>Serviço:</strong> ${{newBooking.service}}<br>
+                ✂️ <strong>Serviço:</strong> ${{newBooking.servico}}<br>
                 📅 <strong>Data:</strong> ${{formattedDate}}<br>
-                ⏰ <strong>Horário:</strong> ${{newBooking.time}}<br>
-                💰 <strong>Valor:</strong> R$ ${{newBooking.price.toFixed(2).replace('.', ',')}}
+                ⏰ <strong>Horário:</strong> ${{newBooking.horario}}<br>
+                💰 <strong>Valor:</strong> R$ ${{newBooking.valor.toFixed(2).replace('.', ',')}}
             `;
             document.getElementById('google-calendar-link').href = googleUrl;
             document.getElementById('success-modal').classList.remove('hidden');
@@ -512,15 +519,15 @@ html_code = f"""
         }}
 
         function generateGoogleCalendarUrl(booking) {{
-            const title = encodeURIComponent(`Barbearia Style: ${{booking.service}}`);
-            const details = encodeURIComponent(`Agendamento de ${{booking.service}} para ${{booking.name}}.\\nTelefone: ${{booking.phone}}\\nEndereço: ${{booking.address}}\\nValor: R$ ${{booking.price.toFixed(2)}}`);
+            const title = encodeURIComponent(`Barbearia Style: ${{booking.servico}}`);
+            const details = encodeURIComponent(`Agendamento de ${{booking.servico}} para ${{booking.name}}.\\nTelefone: ${{booking.telefone}}\\nE-mail: ${{booking.email}}\\nValor: R$ ${{booking.valor.toFixed(2)}}`);
             const location = encodeURIComponent("Barbearia Style");
 
-            const [year, month, day] = booking.date.split('-');
-            const [hour, minute] = booking.time.split(':');
+            const [year, month, day] = booking.data.split('-');
+            const [hour, minute] = booking.horario.split(':');
             
             const startDate = new Date(Date.UTC(year, month - 1, day, hour, minute));
-            const endDate = new Date(startDate.getTime() + (booking.duration || 30) * 60000);
+            const endDate = new Date(startDate.getTime() + (booking.duracao || 30) * 60000);
 
             const isoStart = startDate.toISOString().replace(/-|:|\.\d\d\d/g, "");
             const isoEnd = endDate.toISOString().replace(/-|:|\.\d\d\d/g, "");
