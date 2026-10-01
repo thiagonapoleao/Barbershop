@@ -239,7 +239,6 @@ html_code = """
             loadClientsList();
         };
 
-        // Carrega lista de clientes cadastrados da planilha
         async function loadClientsList() {
             try {
                 const res = await fetch(`${WEB_APP_URL}?action=list_clients`);
@@ -272,7 +271,6 @@ html_code = """
             }
         }
 
-        // Renderiza os agendamentos e atualiza o resumo financeiro
         async function renderBookings() {
             const filterDate = document.getElementById('filter-date').value;
             const container = document.getElementById('bookings-list');
@@ -318,8 +316,8 @@ html_code = """
                             }
                         });
 
-                        // Extração robusta do nome e serviço pelo título
-                        let cleanTitle = item.title.replace(/^💈\\s*/, '');
+                        const isCompleted = item.title.includes('[CONCLUÍDO]') || desc.includes('ATENDIMENTO CONCLUÍDO');
+                        let cleanTitle = item.title.replace(/^✅\s*\[CONCLUÍDO\]\s*/i, '').replace(/^💈\s*/, '');
                         let extractedName = cleanTitle;
                         let extractedService = service;
 
@@ -340,7 +338,7 @@ html_code = """
                             email: email || '',
                             price: price,
                             date: filterDate,
-                            status: 'confirmado'
+                            isCompleted: isCompleted
                         };
                     });
                 } else {
@@ -351,24 +349,22 @@ html_code = """
                 bookings = [];
             }
 
-            // 2. Busca o resumo financeiro da aba Histórico da Planilha
+            // 2. Busca resumo financeiro na aba Historico_Atendimentos
             try {
                 const fRes = await fetch(`${WEB_APP_URL}?action=get_financial_summary&date=${filterDate}`);
                 const fData = await fRes.json();
                 if (fData.status === 'ok') {
-                    document.getElementById('metric-received-day').innerText = `R$ ${fData.totalDia.toFixed(2).replace('.', ',')}`;
+                    document.getElementById('metric-received-day').innerText = `R$ ${Number(fData.totalDia).toFixed(2).replace('.', ',')}`;
                     document.getElementById('metric-qty-day').innerText = `${fData.qtdDia} atendimentos`;
-                    document.getElementById('metric-received-month').innerText = `R$ ${fData.totalMes.toFixed(2).replace('.', ',')}`;
+                    document.getElementById('metric-received-month').innerText = `R$ ${Number(fData.totalMes).toFixed(2).replace('.', ',')}`;
                     document.getElementById('metric-qty-month').innerText = `${fData.qtdMes} atendimentos`;
                 }
             } catch (errF) {
                 console.warn("Erro ao buscar resumo financeiro:", errF);
             }
 
-            // Atualiza métricas da Agenda
-            const activeBookings = bookings.filter(b => b.status !== 'cancelado');
-            const totalRevenue = activeBookings.reduce((acc, curr) => acc + (curr.price || 0), 0);
-
+            // Métricas da agenda
+            const totalRevenue = bookings.reduce((acc, curr) => acc + (curr.price || 0), 0);
             document.getElementById('metric-total').innerText = bookings.length;
             document.getElementById('metric-revenue').innerText = `R$ ${totalRevenue.toFixed(2).replace('.', ',')}`;
 
@@ -389,9 +385,15 @@ html_code = """
                         <div class="flex items-center gap-3">
                             <span class="gold-text font-bold text-xl">${b.time}</span>
                             <span class="font-bold text-base text-white">${b.name}</span>
-                            <span class="text-xs px-2.5 py-0.5 rounded-full bg-blue-900/40 text-blue-400">
-                                Agendado
-                            </span>
+                            ${b.isCompleted ? `
+                                <span class="text-xs px-2.5 py-0.5 rounded-full bg-green-950/60 text-green-400 border border-green-800/60 font-semibold flex items-center gap-1">
+                                    <i class="fa-solid fa-check"></i> Concluído
+                                </span>
+                            ` : `
+                                <span class="text-xs px-2.5 py-0.5 rounded-full bg-blue-900/40 text-blue-400">
+                                    Agendado
+                                </span>
+                            `}
                         </div>
                         <p class="text-xs text-zinc-300">
                             <strong>Serviço:</strong> ${b.service} 
@@ -404,12 +406,16 @@ html_code = """
                     </div>
 
                     <div class="flex items-center gap-2 w-full sm:w-auto justify-end border-t sm:border-t-0 pt-3 sm:pt-0 border-zinc-800">
-                        <!-- Botão Concluir Atendimento (Lança na planilha de histórico) -->
-                        <button onclick="completeAttendance(${idx})" class="text-xs bg-green-700 hover:bg-green-600 text-white font-semibold px-3 py-2 rounded-lg transition flex items-center gap-1.5 shadow">
-                            <i class="fa-solid fa-circle-check"></i> Concluir Atendimento
-                        </button>
+                        ${b.isCompleted ? `
+                            <button disabled class="text-xs bg-zinc-800/80 text-zinc-500 px-3 py-2 rounded-lg cursor-not-allowed flex items-center gap-1.5 border border-zinc-700/50">
+                                <i class="fa-solid fa-check-double text-green-500"></i> Lançado na Planilha
+                            </button>
+                        ` : `
+                            <button onclick="completeAttendance(${idx})" class="text-xs bg-green-700 hover:bg-green-600 text-white font-semibold px-3 py-2 rounded-lg transition flex items-center gap-1.5 shadow">
+                                <i class="fa-solid fa-circle-check"></i> Concluir Atendimento
+                            </button>
+                        `}
 
-                        <!-- Botão Cancelar (Abre aviso no WhatsApp e remove da agenda) -->
                         <button onclick="handleCancel(${idx})" class="text-xs text-red-400 hover:text-red-300 border border-red-900/50 bg-red-950/20 px-3 py-2 rounded-lg transition flex items-center gap-1">
                             <i class="fa-solid fa-ban"></i> Cancelar
                         </button>
@@ -418,10 +424,9 @@ html_code = """
             `).join('');
         }
 
-        // Conclui atendimento e grava na aba Historico_Atendimentos
         async function completeAttendance(idx) {
             const b = bookings[idx];
-            if (!confirm(`Deseja confirmar a conclusão do atendimento de ${b.name}? O valor de R$ ${b.price.toFixed(2).replace('.', ',')} será lançado na planilha de histórico.`)) {
+            if (!confirm(`Confirmar conclusão do atendimento de ${b.name}? O valor de R$ ${b.price.toFixed(2).replace('.', ',')} será lançado no Histórico da planilha e mantido na agenda como confirmado.`)) {
                 return;
             }
 
@@ -445,7 +450,7 @@ html_code = """
                     body: JSON.stringify(payload)
                 });
 
-                alert("✅ Atendimento concluído com sucesso e lançado na planilha de histórico!");
+                alert("✅ Atendimento concluído! Lançado na planilha e mantido na agenda com observação.");
                 renderBookings();
             } catch (err) {
                 console.error("Erro ao concluir:", err);
@@ -453,14 +458,12 @@ html_code = """
             }
         }
 
-        // Cancelamento com mensagem de WhatsApp
         async function handleCancel(idx) {
             const b = bookings[idx];
             if (!confirm(`Deseja realmente cancelar o agendamento de ${b.name} às ${b.time}?`)) {
                 return;
             }
 
-            // Exclui do Google Agenda
             try {
                 await fetch(WEB_APP_URL, {
                     method: 'POST',
@@ -472,11 +475,9 @@ html_code = """
                 console.error("Erro ao cancelar:", e);
             }
 
-            // Formata telefone (remove caracteres não numéricos)
             const cleanPhone = (b.phone || '').replace(/\\D/g, '');
             const dataFmt = b.date.split('-').reverse().join('/');
             
-            // Mensagem elegante de cancelamento pronta para o cliente
             const textoMensagem = encodeURIComponent(
                 `Olá, ${b.name}! 💈\\n` +
                 `Informamos que o seu agendamento na Barbearia Style para o serviço *${b.service}*, marcado para o dia *${dataFmt}* às *${b.time}*, precisou ser *cancelado*.\\n\\n` +
@@ -485,7 +486,6 @@ html_code = """
 
             const whatsappUrl = cleanPhone ? `https://wa.me/55${cleanPhone}?text=${textoMensagem}` : `https://wa.me/?text=${textoMensagem}`;
 
-            // Exibe modal de confirmação e disparo para o WhatsApp
             document.getElementById('cancel-preview-name').innerText = b.name;
             document.getElementById('cancel-preview-details').innerText = `${b.service} | ${dataFmt} às ${b.time} (${b.phone || 'Sem fone'})`;
             document.getElementById('btn-whatsapp-cancel').href = whatsappUrl;
@@ -501,7 +501,6 @@ html_code = """
             document.getElementById('modal-cancel-msg').classList.remove('flex');
         }
 
-        // Modal de Novo Agendamento pelo Barbeiro
         function openBookingModal() {
             document.getElementById('modal-new-booking').classList.remove('hidden');
             document.getElementById('modal-new-booking').classList.add('flex');
