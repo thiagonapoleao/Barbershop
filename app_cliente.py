@@ -240,7 +240,7 @@ html_code = f"""
             {{ id: 'combo', name: 'Corte + Barba', price: 70.00, durationMin: 60, duration: '60 min', icon: 'fa-crown' }}
         ];
 
-        // Grade de horários de 30 em 30 minutos das 09:00 até as 18:00
+        // Grade de horários: de 30 em 30 minutos a partir das 09:00 até as 18:00
         const defaultTimeSlots = [
             "09:00", "09:30", 
             "10:00", "10:30", 
