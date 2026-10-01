@@ -68,7 +68,7 @@ html_code = """
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <div>
                 <h2 class="text-2xl font-bold">Fila de Atendimentos</h2>
-                <p class="text-zinc-400 text-xs">Visualize, conclua e lance atendimentos na planilha com facilidade.</p>
+                <p class="text-zinc-400 text-xs">Visualize, conclua e lance atendimentos no sistema com facilidade.</p>
             </div>
             
             <div class="flex items-center gap-2 w-full sm:w-auto">
@@ -88,7 +88,7 @@ html_code = """
             </div>
         </div>
 
-        <!-- Métricas Rápidas: Agenda + Financeiro da Planilha -->
+        <!-- Métricas Rápidas: Agenda + Financeiro -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
             <div class="card-dark p-3.5 rounded-xl border border-zinc-800">
                 <span class="text-zinc-400 text-[11px] block">Agenda do Dia</span>
@@ -230,6 +230,19 @@ html_code = """
         let bookings = [];
         let clientsList = [];
 
+        // Converte qualquer formato de data (YYYY-MM-DD ou Date string) para PT-BR (DD/MM/AAAA)
+        function formatDateBR(dateStr) {
+            if (!dateStr) return '';
+            const clean = dateStr.toString().split('T')[0].trim();
+            if (clean.includes('-')) {
+                const parts = clean.split('-');
+                if (parts.length === 3) {
+                    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+                }
+            }
+            return clean;
+        }
+
         window.onload = () => {
             const today = new Date().toISOString().split('T')[0];
             const dateInput = document.getElementById('filter-date');
@@ -280,7 +293,7 @@ html_code = """
             container.innerHTML = `
                 <div class="text-center text-zinc-400 py-12 card-dark rounded-xl border border-zinc-800">
                     <i class="fa-solid fa-circle-notch fa-spin text-2xl gold-text mb-3 block"></i>
-                    Carregando dados da Agenda e da Planilha...
+                    Carregando dados da Agenda e do Sistema...
                 </div>`;
 
             // 1. Busca agendamentos da agenda
@@ -349,7 +362,7 @@ html_code = """
                 bookings = [];
             }
 
-            // 2. Busca resumo financeiro na aba Historico_Atendimentos
+            // 2. Busca resumo financeiro na aba do sistema
             try {
                 const fRes = await fetch(`${WEB_APP_URL}?action=get_financial_summary&date=${filterDate}`);
                 const fData = await fRes.json();
@@ -401,14 +414,14 @@ html_code = """
                         </p>
                         <p class="text-xs text-zinc-400">
                             <i class="fa-brands fa-whatsapp text-green-500 mr-1"></i> ${b.phone || 'Sem fone'}
-                            ${b.birthdate ? `<span class="ml-3"><i class="fa-solid fa-cake-candles mr-1"></i> Nasc: ${b.birthdate}</span>` : ''}
+                            ${b.birthdate ? `<span class="ml-3"><i class="fa-solid fa-cake-candles mr-1"></i> Nasc: ${formatDateBR(b.birthdate)}</span>` : ''}
                         </p>
                     </div>
 
                     <div class="flex items-center gap-2 w-full sm:w-auto justify-end border-t sm:border-t-0 pt-3 sm:pt-0 border-zinc-800">
                         ${b.isCompleted ? `
                             <button disabled class="text-xs bg-zinc-800/80 text-zinc-500 px-3 py-2 rounded-lg cursor-not-allowed flex items-center gap-1.5 border border-zinc-700/50">
-                                <i class="fa-solid fa-check-double text-green-500"></i> Lançado na Planilha
+                                <i class="fa-solid fa-check-double text-green-500"></i> Lançado no Sistema
                             </button>
                         ` : `
                             <button onclick="completeAttendance(${idx})" class="text-xs bg-green-700 hover:bg-green-600 text-white font-semibold px-3 py-2 rounded-lg transition flex items-center gap-1.5 shadow">
@@ -426,7 +439,7 @@ html_code = """
 
         async function completeAttendance(idx) {
             const b = bookings[idx];
-            if (!confirm(`Confirmar conclusão do atendimento de ${b.name}? O valor de R$ ${b.price.toFixed(2).replace('.', ',')} será lançado no Histórico da planilha e mantido na agenda como confirmado.`)) {
+            if (!confirm(`Confirmar conclusão do atendimento de ${b.name}? O valor de R$ ${b.price.toFixed(2).replace('.', ',')} será lançado no Histórico do sistema e mantido na agenda como confirmado.`)) {
                 return;
             }
 
@@ -435,7 +448,7 @@ html_code = """
                     action: "complete_attendance",
                     eventId: b.id,
                     nome: b.name,
-                    nascimento: b.birthdate,
+                    nascimento: formatDateBR(b.birthdate),
                     telefone: b.phone,
                     data: b.date,
                     servico: b.service,
@@ -450,11 +463,11 @@ html_code = """
                     body: JSON.stringify(payload)
                 });
 
-                alert("✅ Atendimento concluído! Lançado na planilha e mantido na agenda com observação.");
+                alert("✅ Atendimento concluído com sucesso e lançado no sistema!");
                 renderBookings();
             } catch (err) {
                 console.error("Erro ao concluir:", err);
-                alert("Erro ao lançar atendimento na planilha.");
+                alert("Erro ao lançar atendimento no sistema.");
             }
         }
 
@@ -476,7 +489,7 @@ html_code = """
             }
 
             const cleanPhone = (b.phone || '').replace(/\\D/g, '');
-            const dataFmt = b.date.split('-').reverse().join('/');
+            const dataFmt = formatDateBR(b.date);
             
             const textoMensagem = encodeURIComponent(
                 `Olá, ${b.name}! 💈\\n` +
@@ -531,7 +544,7 @@ html_code = """
                 const payload = {
                     nome: name,
                     telefone: phone,
-                    nascimento: birthdate,
+                    nascimento: formatDateBR(birthdate),
                     servico: service,
                     valor: price,
                     duracao: duration,
