@@ -56,9 +56,6 @@ html_code = """
                 <h1 class="text-xl font-bold tracking-wide">PAINEL DO <span class="gold-text">BARBEIRO</span></h1>
             </div>
             <div class="flex items-center gap-2">
-                <a href="https://docs.google.com/spreadsheets/d/1O4tH5v9lzYiMCz-bvf_l9e7iDU_4CWvUYitrSs9RvHE/edit?gid=1507373231#gid=1507373231" target="_blank" class="text-xs text-zinc-300 border border-zinc-700 px-3 py-1.5 rounded-full hover:bg-zinc-800 transition flex items-center gap-1.5">
-                    <i class="fa-solid fa-table text-green-500"></i> Planilha
-                </a>
                 <a href="https://calendar.google.com" target="_blank" class="text-xs gold-text border border-yellow-600/50 px-3 py-1.5 rounded-full hover:bg-yellow-500 hover:text-black transition flex items-center gap-1.5">
                     <i class="fa-brands fa-google"></i> Google Agenda
                 </a>
@@ -102,7 +99,7 @@ html_code = """
                 <span id="metric-revenue" class="text-xl font-bold gold-text">R$ 0,00</span>
             </div>
             <div class="card-dark p-3.5 rounded-xl border border-zinc-800">
-                <span class="text-zinc-400 text-[11px] block">Recebido Hoje (Planilha)</span>
+                <span class="text-zinc-400 text-[11px] block">Recebido no Dia (Confirmado)</span>
                 <span id="metric-received-day" class="text-xl font-bold text-green-400">R$ 0,00</span>
                 <span id="metric-qty-day" class="text-[10px] text-zinc-500 block">0 atendimentos</span>
             </div>
@@ -321,12 +318,23 @@ html_code = """
                             }
                         });
 
+                        // Extração robusta do nome e serviço pelo título
+                        let cleanTitle = item.title.replace(/^💈\\s*/, '');
+                        let extractedName = cleanTitle;
+                        let extractedService = service;
+
+                        if (cleanTitle.includes(' - ')) {
+                            const titleParts = cleanTitle.split(' - ');
+                            extractedService = extractedService || titleParts[0].trim();
+                            extractedName = titleParts[1].trim();
+                        }
+
                         return {
                             id: item.id,
                             title: item.title,
                             time: item.time,
-                            name: item.title.replace(/^💈\\s*/, '').split(' - ')[1] || item.title,
-                            service: service || item.title.replace(/^💈\\s*/, '').split(' - ')[0] || 'Serviço',
+                            name: extractedName || 'Cliente',
+                            service: extractedService || 'Serviço',
                             phone: phone || '',
                             birthdate: birthdate || '',
                             email: email || '',
@@ -542,7 +550,6 @@ html_code = """
                 alert("✅ Agendamento realizado com sucesso na Google Agenda!");
                 closeBookingModal();
                 
-                // Atualiza a visualização caso seja o mesmo dia
                 document.getElementById('filter-date').value = date;
                 renderBookings();
             } catch (err) {
