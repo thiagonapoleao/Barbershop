@@ -184,7 +184,10 @@ html_code = f"""
                     </h3>
                     
                     <div class="mb-6">
-                        <label class="block text-xs text-zinc-400 mb-2">Selecione o Dia *</label>
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="block text-xs text-zinc-400">Selecione o Dia *</label>
+                            <span id="status-sync-slots" class="text-[11px] text-zinc-500"></span>
+                        </div>
                         <input type="date" id="booking-date" required onchange="renderTimeSlots()" class="w-full p-3 rounded-lg input-dark text-sm">
                     </div>
 
@@ -240,7 +243,7 @@ html_code = f"""
             {{ id: 'combo', name: 'Corte + Barba', price: 70.00, durationMin: 60, duration: '60 min', icon: 'fa-crown' }}
         ];
 
-        // Grade de horários: de 30 em 30 minutos a partir das 09:00 até as 18:00
+        // Grade fixa: de 30 em 30 minutos a partir das 09:00 até as 18:00
         const defaultTimeSlots = [
             "09:00", "09:30", 
             "10:00", "10:30", 
@@ -257,12 +260,35 @@ html_code = f"""
         let currentUser = null;
         let selectedService = services[0];
         let selectedTime = null;
+        let occupiedSlots = [];
 
         window.onload = () => {{
             checkExistingSession();
             renderServices();
             setMinDate();
+            renderFixedGrid(); // Renderiza a tabela fixa imediatamente
+            renderTimeSlots();
         }};
+
+        /* ---------- RENDERIZAÇÃO DA TABELA FIXADA ---------- */
+        function renderFixedGrid() {{
+            const container = document.getElementById('timeslots-container');
+            container.innerHTML = defaultTimeSlots.map(time => {{
+                const isOccupied = occupiedSlots.includes(time);
+                if (isOccupied) {{
+                    return `
+                        <button type="button" disabled class="p-2 rounded-lg bg-zinc-800/40 text-zinc-600 border border-zinc-800 text-xs cursor-not-allowed line-through">
+                            ${{time}}
+                        </button>`;
+                }}
+                const isSelected = selectedTime === time;
+                return `
+                    <button type="button" onclick="selectTime('${{time}}')" id="time-btn-${{time.replace(':', '')}}" 
+                            class="p-2 rounded-lg border text-xs font-medium transition ${{isSelected ? 'gold-bg text-black border-yellow-500 font-bold' : 'input-dark border-zinc-700 hover:border-yellow-500'}}">
+                        ${{time}}
+                    </button>`;
+            }}).join('');
+        }}
 
         /* ---------- GESTÃO DE AUTENTICAÇÃO COM PLANILHA ---------- */
         function checkExistingSession() {{
@@ -411,7 +437,6 @@ html_code = f"""
         function selectService(id) {{
             selectedService = services.find(s => s.id === id);
             renderServices();
-            renderTimeSlots();
         }}
 
         function updateTotalPrice() {{
@@ -420,39 +445,28 @@ html_code = f"""
 
         async function renderTimeSlots() {{
             const dateVal = document.getElementById('booking-date').value;
-            const container = document.getElementById('timeslots-container');
+            const statusEl = document.getElementById('status-sync-slots');
             selectedTime = null;
 
             if (!dateVal) return;
 
-            container.innerHTML = '<p class="col-span-4 text-xs text-zinc-400 py-2"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Consultando agenda...</p>';
+            // Mantém os botões visíveis e atualiza apenas o status
+            if (statusEl) statusEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Verificando disponibilidade...';
 
-            let occupied = [];
             try {{
                 const res = await fetch(`${{WEB_APP_URL}}?action=get_busy&date=${{dateVal}}`);
                 const data = await res.json();
                 if (data.status === 'ok') {{
-                    occupied = data.busy.map(b => b.start);
+                    occupiedSlots = data.busy.map(b => b.start);
+                }} else {{
+                    occupiedSlots = [];
                 }}
             }} catch(e) {{
-                console.warn(e);
+                occupiedSlots = [];
+            }} finally {{
+                if (statusEl) statusEl.innerHTML = '<span class="text-green-400"><i class="fa-solid fa-circle-check mr-1"></i> Agenda atualizada</span>';
+                renderFixedGrid(); // Atualiza a tabela fixada desabilitando os ocupados
             }}
-
-            container.innerHTML = defaultTimeSlots.map(time => {{
-                const isOccupied = occupied.includes(time);
-                if (isOccupied) {{
-                    return `
-                        <button type="button" disabled class="p-2 rounded-lg bg-zinc-800/40 text-zinc-600 border border-zinc-800 text-xs cursor-not-allowed line-through">
-                            ${{time}}
-                        </button>`;
-                }}
-                const isSelected = selectedTime === time;
-                return `
-                    <button type="button" onclick="selectTime('${{time}}')" id="time-btn-${{time.replace(':', '')}}" 
-                            class="p-2 rounded-lg border text-xs font-medium transition ${{isSelected ? 'gold-bg text-black border-yellow-500 font-bold' : 'input-dark border-zinc-700 hover:border-yellow-500'}}">
-                        ${{time}}
-                    </button>`;
-            }}).join('');
         }}
 
         function selectTime(time) {{
