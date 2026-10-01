@@ -110,7 +110,7 @@ html_code = f"""
                         <i class="fa-solid fa-user-plus"></i>
                     </div>
                     <h2 class="text-2xl font-bold">Criar Conta</h2>
-                    <p class="text-zinc-400 text-xs mt-1">Seu cadastro será registrado na planilha com segurança</p>
+                    <p class="text-zinc-400 text-xs mt-1">Preencha todos os campos obrigatórios abaixo</p>
                 </div>
 
                 <form onsubmit="handleRegister(event)" class="space-y-4">
@@ -237,13 +237,26 @@ html_code = f"""
     <script>
         const WEB_APP_URL = "{WEB_APP_URL}";
 
+        // Função universal para formatar qualquer data para o padrão PT-BR (DD/MM/AAAA)
+        function formatDateBR(dateStr) {{
+            if (!dateStr) return '';
+            const clean = dateStr.toString().split('T')[0].trim();
+            if (clean.includes('-')) {{
+                const parts = clean.split('-');
+                if (parts.length === 3) {{
+                    return `${{parts[2].padStart(2, '0')}}/${{parts[1].padStart(2, '0')}}/${{parts[0]}}`;
+                }}
+            }}
+            return clean;
+        }}
+
         const services = [
             {{ id: 'corte', name: 'Corte de Cabelo', price: 45.00, durationMin: 30, duration: '30 min', icon: 'fa-scissors' }},
             {{ id: 'barba', name: 'Barba Modelada', price: 35.00, durationMin: 30, duration: '30 min', icon: 'fa-user' }},
             {{ id: 'combo', name: 'Corte + Barba', price: 70.00, durationMin: 60, duration: '60 min', icon: 'fa-crown' }}
         ];
 
-        // Grade fixa: de 30 em 30 minutos a partir das 09:00 até as 18:00
+        // Grade fixa: 30 em 30 minutos das 09:00 até as 18:00
         const defaultTimeSlots = [
             "09:00", "09:30", 
             "10:00", "10:30", 
@@ -266,7 +279,7 @@ html_code = f"""
             checkExistingSession();
             renderServices();
             setMinDate();
-            renderFixedGrid(); // Renderiza a tabela fixa imediatamente
+            renderFixedGrid();
             renderTimeSlots();
         }};
 
@@ -316,22 +329,32 @@ html_code = f"""
 
         async function handleRegister(e) {{
             e.preventDefault();
-            const btn = document.getElementById('btn-register');
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Gravando na Planilha...';
 
             const name = document.getElementById('reg-name').value.trim();
             const phone = document.getElementById('reg-phone').value.trim();
-            const birthdate = document.getElementById('reg-birthdate').value;
+            const birthdate = document.getElementById('reg-birthdate').value.trim();
             const email = document.getElementById('reg-email').value.trim().toLowerCase();
-            const password = document.getElementById('reg-password').value;
+            const password = document.getElementById('reg-password').value.trim();
+
+            // Validação estrita: todos os campos são 100% obrigatórios
+            if (!name || !phone || !birthdate || !email || !password) {{
+                alert("Por favor, preencha todos os campos obrigatórios do cadastro.");
+                return;
+            }}
+
+            const btn = document.getElementById('btn-register');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Gravando no sistema...';
+
+            // Data de nascimento formatada estritamente em PT-BR (DD/MM/AAAA)
+            const birthdateBR = formatDateBR(birthdate);
 
             try {{
                 const params = new URLSearchParams({{
                     action: "register",
                     nome: name,
                     telefone: phone,
-                    nascimento: birthdate,
+                    nascimento: birthdateBR,
                     email: email,
                     senha: password
                 }});
@@ -340,15 +363,15 @@ html_code = f"""
                 const res = await response.json();
 
                 if (res.status === 'success') {{
-                    currentUser = {{ name, phone, birthdate, email }};
+                    currentUser = {{ name, phone, birthdate: birthdateBR, email }};
                     localStorage.setItem('barber_current_client', JSON.stringify(currentUser));
                     showBookingView();
                 }} else {{
-                    alert(res.message || "Erro ao cadastrar na planilha.");
+                    alert(res.message || "Erro ao realizar cadastro.");
                 }}
             }} catch (error) {{
                 console.error("Erro no cadastro:", error);
-                alert("Erro ao conectar à planilha. Verifique as permissões do script.");
+                alert("Erro ao conectar ao sistema. Verifique sua conexão.");
             }} finally {{
                 btn.disabled = false;
                 btn.innerHTML = 'Finalizar Cadastro';
@@ -357,12 +380,18 @@ html_code = f"""
 
         async function handleLogin(e) {{
             e.preventDefault();
-            const btn = document.getElementById('btn-login');
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Validando acesso...';
 
             const email = document.getElementById('login-email').value.trim().toLowerCase();
             const password = document.getElementById('login-password').value;
+
+            if (!email || !password) {{
+                alert("Por favor, informe seu e-mail e sua senha.");
+                return;
+            }}
+
+            const btn = document.getElementById('btn-login');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Validando acesso...';
 
             try {{
                 const response = await fetch(`${{WEB_APP_URL}}?action=login&email=${{encodeURIComponent(email)}}&password=${{encodeURIComponent(password)}}`);
@@ -372,7 +401,7 @@ html_code = f"""
                     currentUser = {{
                         name: res.user.nome,
                         phone: res.user.telefone,
-                        birthdate: res.user.nascimento,
+                        birthdate: formatDateBR(res.user.nascimento),
                         email: res.user.email
                     }};
                     localStorage.setItem('barber_current_client', JSON.stringify(currentUser));
@@ -381,7 +410,7 @@ html_code = f"""
                     alert(res.message || "E-mail ou senha inválidos.");
                 }}
             }} catch (error) {{
-                alert("Erro ao consultar a planilha de clientes. Verifique sua conexão.");
+                alert("Erro ao consultar o sistema de clientes. Verifique sua conexão.");
             }} finally {{
                 btn.disabled = false;
                 btn.innerHTML = 'Entrar';
@@ -405,8 +434,8 @@ html_code = f"""
             document.getElementById('display-client-name').innerText = currentUser.name;
             document.getElementById('display-client-phone').innerText = currentUser.phone;
             
-            const nascFormatted = currentUser.birthdate ? currentUser.birthdate.toString().split('T')[0].split('-').reverse().join('/') : '';
-            document.getElementById('display-client-info').innerText = `📧 ${{currentUser.email}} | 🎂 ${{nascFormatted}}`;
+            const nascBR = formatDateBR(currentUser.birthdate);
+            document.getElementById('display-client-info').innerText = `📧 ${{currentUser.email}} | 🎂 ${{nascBR}}`;
             renderTimeSlots();
         }}
 
@@ -450,7 +479,6 @@ html_code = f"""
 
             if (!dateVal) return;
 
-            // Mantém os botões visíveis e atualiza apenas o status
             if (statusEl) statusEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Verificando disponibilidade...';
 
             try {{
@@ -465,7 +493,7 @@ html_code = f"""
                 occupiedSlots = [];
             }} finally {{
                 if (statusEl) statusEl.innerHTML = '<span class="text-green-400"><i class="fa-solid fa-circle-check mr-1"></i> Agenda atualizada</span>';
-                renderFixedGrid(); // Atualiza a tabela fixada desabilitando os ocupados
+                renderFixedGrid();
             }}
         }}
 
@@ -496,15 +524,18 @@ html_code = f"""
             submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Agendando no Google...';
 
             const date = document.getElementById('booking-date').value;
+            const dateBR = formatDateBR(date);
 
             const newBooking = {{
                 nome: currentUser.name,
                 telefone: currentUser.phone,
+                nascimento: formatDateBR(currentUser.birthdate),
                 email: currentUser.email,
                 servico: selectedService.name,
                 valor: selectedService.price,
                 duracao: selectedService.durationMin,
-                data: date,
+                data: date,       // Formato ISO para a data do evento
+                data_br: dateBR,  // Data em formato PT-BR para lançamentos e descrições
                 horario: selectedTime
             }};
 
@@ -530,11 +561,11 @@ html_code = f"""
             }}
 
             const googleUrl = generateGoogleCalendarUrl(newBooking);
-            const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('pt-BR');
+
             document.getElementById('modal-details').innerHTML = `
                 <strong>${{newBooking.nome}}</strong>, seu agendamento foi realizado!<br><br>
                 ✂️ <strong>Serviço:</strong> ${{newBooking.servico}}<br>
-                📅 <strong>Data:</strong> ${{formattedDate}}<br>
+                📅 <strong>Data:</strong> ${{dateBR}}<br>
                 ⏰ <strong>Horário:</strong> ${{newBooking.horario}}<br>
                 💰 <strong>Valor:</strong> R$ ${{newBooking.valor.toFixed(2).replace('.', ',')}}
             `;
@@ -547,7 +578,7 @@ html_code = f"""
 
         function generateGoogleCalendarUrl(booking) {{
             const title = encodeURIComponent(`Barbearia Style: ${{booking.servico}}`);
-            const details = encodeURIComponent(`Agendamento de ${{booking.servico}} para ${{booking.nome}}.\\nTelefone: ${{booking.telefone}}\\nE-mail: ${{booking.email}}\\nValor: R$ ${{booking.valor.toFixed(2)}}`);
+            const details = encodeURIComponent(`Agendamento de ${{booking.servico}} para ${{booking.nome}}.\\nTelefone: ${{booking.telefone}}\\nNascimento: ${{booking.nascimento}}\\nE-mail: ${{booking.email}}\\nData: ${{booking.data_br}}\\nValor: R$ ${{booking.valor.toFixed(2)}}`);
             const location = encodeURIComponent("Barbearia Style");
 
             const [year, month, day] = booking.data.split('-');
