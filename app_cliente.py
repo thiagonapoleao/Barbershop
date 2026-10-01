@@ -189,8 +189,8 @@ html_code = f"""
                     </div>
 
                     <div>
-                        <label class="block text-xs text-zinc-400 mb-2">Horários Disponíveis *</label>
-                        <div id="timeslots-container" class="grid grid-cols-3 sm:grid-cols-4 gap-2"></div>
+                        <label class="block text-xs text-zinc-400 mb-2">Horários Disponíveis (09:00 às 18:00) *</label>
+                        <div id="timeslots-container" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2"></div>
                     </div>
                 </div>
 
@@ -240,7 +240,19 @@ html_code = f"""
             {{ id: 'combo', name: 'Corte + Barba', price: 70.00, durationMin: 60, duration: '60 min', icon: 'fa-crown' }}
         ];
 
-        const defaultTimeSlots = ["09:00", "09:45", "10:30", "11:15", "14:00", "14:45", "15:30", "16:15", "17:00", "17:45", "18:30"];
+        // Grade de horários de 30 em 30 minutos das 09:00 até as 18:00
+        const defaultTimeSlots = [
+            "09:00", "09:30", 
+            "10:00", "10:30", 
+            "11:00", "11:30", 
+            "12:00", "12:30", 
+            "13:00", "13:30", 
+            "14:00", "14:30", 
+            "15:00", "15:30", 
+            "16:00", "16:30", 
+            "17:00", "17:30", 
+            "18:00"
+        ];
 
         let currentUser = null;
         let selectedService = services[0];
@@ -298,7 +310,6 @@ html_code = f"""
                     senha: password
                 }});
 
-                // Envia via GET garantindo que o Google Sheets grave os dados sem erro de CORS
                 const response = await fetch(`${{WEB_APP_URL}}?${{params.toString()}}`);
                 const res = await response.json();
 
@@ -311,7 +322,7 @@ html_code = f"""
                 }}
             }} catch (error) {{
                 console.error("Erro no cadastro:", error);
-                alert("Erro ao conectar à planilha. Verifique se publicou a 'Nova versão' no Apps Script.");
+                alert("Erro ao conectar à planilha. Verifique as permissões do script.");
             }} finally {{
                 btn.disabled = false;
                 btn.innerHTML = 'Finalizar Cadastro';
